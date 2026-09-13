@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 38" width="160" height="38" fill="none">
+  <defs>
+    <linearGradient id="logoGlow" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5b63d3" />
+      <stop offset="100%" stop-color="#98a4f7" />
+    </linearGradient>
+    <linearGradient id="logoSurface" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1c1f2e" />
+      <stop offset="100%" stop-color="#11121c" />
+    </linearGradient>
+  </defs>
+
+  <!-- Emblem Icon -->
+  <g transform="translate(1, 1)">
+    <rect width="36" height="36" rx="9" fill="url(#logoSurface)" stroke="#2d3348" stroke-width="1.2" />
+    <path d="M 7 19 L 12 19 L 15 11 L 20 25 L 23 17 L 29 17" 
+          stroke="url(#logoGlow)" 
+          stroke-width="2.6" 
+          stroke-linecap="round" 
+          stroke-linejoin="round" />
+    <circle cx="29" cy="17" r="2" fill="#ffffff" />
+  </g>
+
+  <!-- Wordmark Text -->
+  <text x="47" y="25" fill="#ffffff" font-family="Inter, -apple-system, system-ui, sans-serif" font-size="20" font-weight="600" letter-spacing="-0.5px">Uptrace</text>
+</svg>
