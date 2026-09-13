@@ -23,7 +23,7 @@ data/
 data/uptime_history.json
 
 # Live Status & Telemetry (prevents local test run commits)
-STATUS.md
+# STATUS.md
 
 # OS and Editor files
 .DS_Store
