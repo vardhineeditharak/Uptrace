@@ -1,0 +1,38 @@
+# Python virtual environment
+venv/
+env/
+.venv/
+ENV/
+
+# Python cache & bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+
+# Environment Variables & Secrets
+.env
+.env.*
+!.env.example
+
+# Runtime Log files & Databases
+logs/
+*.log
+data/
+data/uptime_history.json
+
+# Live Status & Telemetry (prevents local test run commits)
+STATUS.md
+
+# OS and Editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary files
+*.tmp
+*.temp
