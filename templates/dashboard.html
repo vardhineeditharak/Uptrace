@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uptrace — Midnight SRE Console</title>
+    <meta name="description" content="Synthetic keep-alive monitoring and incident alerts for cloud web applications and databases.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='assets/favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="app-layout">
+        <!-- Top Navigation (Midnight SRE Console) -->
+        <header class="navbar">
+            <div class="nav-brand">
+                <div class="brand-icon-wrapper">
+                    <img src="{{ url_for('static', filename='assets/uptrace-icon.svg') }}" alt="Uptrace" class="brand-icon-svg" width="36" height="36">
+                </div>
+                <div class="brand-text">
+                    <div class="brand-title-row">
+                        <h1>Uptrace</h1>
+                        <span class="sre-badge">SRE CONSOLE</span>
+                    </div>
+                    <span class="brand-tag">Synthetic Keep-Alive & Multi-Method Incident Monitoring</span>
+                </div>
+            </div>
+
+            <!-- Environment Segmented Switcher (Pill) -->
+            <div class="env-switcher" id="envSwitcher">
+                <button class="env-btn active" data-env="all">All (<span id="allCountBadge">--</span>)</button>
+                <button class="env-btn prod-btn" data-env="production">Production (<span id="prodCountBadge">--</span>)</button>
+                <button class="env-btn dev-btn" data-env="development">Development (<span id="devCountBadge">--</span>)</button>
+                <button class="env-btn staging-btn" data-env="staging">Staging (<span id="stagingCountBadge">--</span>)</button>
+            </div>
+
+            <div class="nav-actions">
+                <div class="sync-info">
+                    <span class="sync-label">Scheduler:</span>
+                    <span class="sync-time" id="countdownTimer">Active</span>
+                </div>
+
+                <!-- GitHub Authentication / User Profile Slot -->
+                <div id="authNavContainer" class="auth-container">
+                    <!-- Populated dynamically by dashboard.js via /api/me -->
+                    <a href="/login" class="btn btn-secondary btn-github-login" id="githubLoginBtn">
+                        <svg class="svg-icon" viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                        </svg>
+                        <span>Sign In</span>
+                    </a>
+                </div>
+
+                <!-- Primary CTA Button (Exclusive Iris Blue Gradient Pill) -->
+                <button class="btn btn-add" onclick="openAddMonitorModal()">
+                    + Add Monitor
+                </button>
+                <button class="btn btn-secondary" id="gitSyncBtn" onclick="triggerGitCommit()">
+                    Push to GitHub
+                </button>
+                <button class="btn btn-secondary" id="refreshBtn" onclick="runLiveHealthCheck()">
+                    Ping All
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-container">
+            <!-- Metric Stat Blocks -->
+            <section class="metrics-grid">
+                <div class="metric-card uptime-stat-card">
+                    <div class="metric-header">
+                        <span class="metric-title" id="uptimeCardTitle">24h Uptime</span>
+                        <span class="metric-icon">📈</span>
+                    </div>
+                    <div class="metric-value" id="overallUptime">100.0%</div>
+                    <div class="metric-footer" id="uptimeCardFooter">Across active monitors</div>
+                </div>
+
+                <div class="metric-card healthy-card">
+                    <div class="metric-header">
+                        <span class="metric-title">Healthy & Active</span>
+                        <span class="metric-icon">🟢</span>
+                    </div>
+                    <div class="metric-value" id="healthyCount">--</div>
+                    <div class="metric-footer">Operating normally</div>
+                </div>
+
+                <div class="metric-card db-card">
+                    <div class="metric-header">
+                        <span class="metric-title">Databases Protected</span>
+                        <span class="metric-icon">🗄️</span>
+                    </div>
+                    <div class="metric-value" id="dbCount">--</div>
+                    <div class="metric-footer">Inactivity sleep prevented</div>
+                </div>
+
+                <div class="metric-card app-card">
+                    <div class="metric-header">
+                        <span class="metric-title">Web Apps & APIs</span>
+                        <span class="metric-icon">🌐</span>
+                    </div>
+                    <div class="metric-value" id="appCount">--</div>
+                    <div class="metric-footer">Multi-Method HTTP & TCP</div>
+                </div>
+            </section>
+
+            <!-- SaaS Partner Cloud Trust Bar (SVGs) -->
+            <section class="trust-bar-section">
+                <div class="trust-bar-header">
+                    <span class="trust-bar-line"></span>
+                    <span class="trust-bar-title">TRUSTED KEEP-ALIVE & SYNTHETIC MONITORING FOR</span>
+                    <span class="trust-bar-line"></span>
+                </div>
+                <div class="trust-logos-grid">
+                    <!-- Render -->
+                    <div class="trust-logo-item" title="Render Cloud Services">
+                        <img src="{{ url_for('static', filename='assets/logos/render.svg') }}" class="trust-svg-img" alt="Render" width="20" height="20">
+                        <span>Render</span>
+                    </div>
+                    <!-- Supabase -->
+                    <div class="trust-logo-item" title="Supabase PostgreSQL">
+                        <img src="{{ url_for('static', filename='assets/logos/supabase.svg') }}" class="trust-svg-img" alt="Supabase" width="20" height="20">
+                        <span>Supabase</span>
+                    </div>
+                    <!-- Vercel -->
+                    <div class="trust-logo-item" title="Vercel Edge Deployments">
+                        <img src="{{ url_for('static', filename='assets/logos/vercel.svg') }}" class="trust-svg-img" alt="Vercel" width="20" height="20">
+                        <span>Vercel</span>
+                    </div>
+                    <!-- Neon -->
+                    <div class="trust-logo-item" title="Neon Serverless Postgres">
+                        <img src="{{ url_for('static', filename='assets/logos/neon.svg') }}" class="trust-svg-img" alt="Neon" width="20" height="20">
+                        <span>Neon</span>
+                    </div>
+                    <!-- Railway -->
+                    <div class="trust-logo-item" title="Railway Infrastructure">
+                        <img src="{{ url_for('static', filename='assets/logos/railway.svg') }}" class="trust-svg-img" alt="Railway" width="20" height="20">
+                        <span>Railway</span>
+                    </div>
+                    <!-- PostgreSQL -->
+                    <div class="trust-logo-item" title="PostgreSQL Databases">
+                        <img src="{{ url_for('static', filename='assets/logos/postgres.svg') }}" class="trust-svg-img" alt="PostgreSQL" width="20" height="20">
+                        <span>Postgres</span>
+                    </div>
+                    <!-- Redis -->
+                    <div class="trust-logo-item" title="Redis Cache">
+                        <img src="{{ url_for('static', filename='assets/logos/redis.svg') }}" class="trust-svg-img" alt="Redis" width="20" height="20">
+                        <span>Redis</span>
+                    </div>
+                    <!-- AWS -->
+                    <div class="trust-logo-item" title="Amazon Web Services">
+                        <img src="{{ url_for('static', filename='assets/logos/aws.svg') }}" class="trust-svg-img" alt="AWS" width="20" height="20">
+                        <span>AWS</span>
+                    </div>
+                    <!-- GitHub Actions -->
+                    <div class="trust-logo-item" title="GitHub Actions 24/7 Automation">
+                        <img src="{{ url_for('static', filename='assets/logos/github.svg') }}" class="trust-svg-img" alt="GitHub" width="20" height="20">
+                        <span>GitHub</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Quick Presets Bar -->
+            <div class="presets-bar">
+                <span class="presets-label">Quick Presets:</span>
+                <button class="preset-pill" onclick="applyPreset('render_prod')">+ Render Web App (GET, 1m)</button>
+                <button class="preset-pill" onclick="applyPreset('vercel_head')">+ Vercel Frontend (HEAD, 5m)</button>
+                <button class="preset-pill" onclick="applyPreset('graphql_post')">+ GraphQL API (POST, 5m)</button>
+                <button class="preset-pill" onclick="applyPreset('supabase_prod')">+ Supabase DB (GET, 6h)</button>
+                <button class="preset-pill" onclick="applyPreset('postgres_prod')">+ PostgreSQL Port (TCP, 1h)</button>
+                <button class="preset-pill" onclick="applyPreset('localhost_dev')">+ Local Dev (GET, 2m)</button>
+                <button class="preset-pill" onclick="applyPreset('redis_staging')">+ Redis Cache (TCP, 15m)</button>
+            </div>
+
+            <!-- Incident Alert Banner (Visible when issues exist) -->
+            <div class="incident-banner hidden" id="incidentBanner">
+                <div class="banner-icon">⚠️</div>
+                <div class="banner-content">
+                    <h4>Service Disruption Detected</h4>
+                    <p id="incidentBannerText">One or more monitored services failed health check. Automated alerts dispatched.</p>
+                </div>
+            </div>
+
+            <!-- Filter Controls & Category Tabs -->
+            <div class="toolbar">
+                <div class="tab-filters" id="categoryTabs">
+                    <button class="tab-btn active" data-category="all">All Categories</button>
+                    <button class="tab-btn" data-category="Web Applications">Web Apps</button>
+                    <button class="tab-btn" data-category="Databases (Keep-Alive)">Databases</button>
+                    <button class="tab-btn" data-category="APIs & Microservices">APIs</button>
+                </div>
+
+                <div class="toolbar-info">
+                    <span>Last Checked: <strong id="lastCheckedTime">Loading...</strong></span>
+                </div>
+            </div>
+
+            <!-- Service Status Grid -->
+            <section class="services-grid" id="servicesGrid">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Executing live keep-alive pings across cloud services & databases...</p>
+                </div>
+            </section>
+
+            <!-- 24/7 Cloud Automation & Live Telemetry Panel -->
+            <section class="streak-card">
+                <div class="streak-content">
+                    <div class="streak-icon">⚡</div>
+                    <div>
+                        <h3>24/7 GitHub Actions Automation & Live Telemetry</h3>
+                        <p>Uptrace logs live uptime telemetry to <a href="/STATUS.md" target="_blank"><code>STATUS.md</code></a>. With GitHub Actions cron running periodically, your cloud services and databases stay warm and operational 24/7.</p>
+                    </div>
+                </div>
+                <div class="streak-actions">
+                    <a href="/STATUS.md" target="_blank" class="btn btn-secondary">View STATUS.md</a>
+                    <button class="btn btn-outline" onclick="triggerGitCommit()">Sync Status Log</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- SaaS Footer -->
+        <footer class="saas-footer">
+            <div class="footer-top">
+                <div class="footer-brand-col">
+                    <div class="footer-logo">
+                        <img src="{{ url_for('static', filename='assets/uptrace-icon.svg') }}" alt="Uptrace" width="24" height="24">
+                        <span>Uptrace</span>
+                    </div>
+                    <p class="footer-tagline">Commercial-grade synthetic keep-alive monitoring and incident response console for high-reliability engineering teams.</p>
+                    <div class="sla-badge">
+                        <span class="sla-dot"></span>
+                        <span>99.99% Synthetic SLA Monitored</span>
+                    </div>
+                </div>
+                <div class="footer-links-group">
+                    <div class="footer-col">
+                        <h4>Platform</h4>
+                        <a href="/STATUS.md" target="_blank">Live Status Report</a>
+                        <a href="/api/status-latest" target="_blank">JSON Health API</a>
+                        <a href="#servicesGrid">Active Monitors</a>
+                    </div>
+                    <div class="footer-col">
+                        <h4>Methods & DBs</h4>
+                        <span>GET / POST / HEAD</span>
+                        <span>PUT / PATCH / DELETE</span>
+                        <span>PostgreSQL & Redis TCP</span>
+                    </div>
+                    <div class="footer-col">
+                        <h4>Account & Auth</h4>
+                        <a href="/login">GitHub Sign In</a>
+                        <a href="/login/demo">Local SRE Demo</a>
+                        <a href="/logout">Sign Out</a>
+                    </div>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>© 2026 Uptrace. Built for developers keeping cloud apps & databases alive.</p>
+                <div class="footer-status-pill">
+                    <span class="live-pulse"></span>
+                    <span>System Fully Operational</span>
+                </div>
+            </div>
+        </footer>
+
+        <!-- ADD / EDIT MONITOR MODAL -->
+        <div class="modal-backdrop hidden" id="monitorModal">
+            <div class="modal-dialog">
+                <div class="modal-header">
+                    <h3 id="modalTitle">+ Add New Monitor</h3>
+                    <button class="modal-close-btn" onclick="closeMonitorModal()">&times;</button>
+                </div>
+                <form id="monitorForm" onsubmit="handleSaveMonitor(event)">
+                    <input type="hidden" id="editMonitorId" value="">
+                    
+                    <div class="form-row">
+                        <div class="form-group col-8">
+                            <label for="monName">Monitor Name *</label>
+                            <input type="text" id="monName" class="form-control" placeholder="e.g. My Render Backend, Supabase DB" required>
+                        </div>
+                        <div class="form-group col-4">
+                            <label for="monEnvironment">Environment *</label>
+                            <select id="monEnvironment" class="form-control">
+                                <option value="production">Production</option>
+                                <option value="development">Development</option>
+                                <option value="staging">Staging</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="monType">Monitor Type *</label>
+                            <select id="monType" class="form-control" onchange="handleMonitorTypeChange()">
+                                <option value="http">HTTP(s) Web Application</option>
+                                <option value="tcp_db">TCP Database Port (Postgres/MySQL/Redis)</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="monCategory">Category</label>
+                            <select id="monCategory" class="form-control">
+                                <option value="Web Applications">Web Applications</option>
+                                <option value="Databases (Keep-Alive)">Databases (Keep-Alive)</option>
+                                <option value="APIs & Microservices">APIs & Microservices</option>
+                                <option value="Custom">Custom</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Individual Ping Schedule & Frequency -->
+                    <div class="form-row">
+                        <div class="form-group col-6">
+                            <label for="monInterval">Ping Schedule / Frequency *</label>
+                            <select id="monInterval" class="form-control">
+                                <option value="30">Every 30 seconds (High Frequency)</option>
+                                <option value="60">Every 1 minute (Render Keep-Alive)</option>
+                                <option value="120">Every 2 minutes</option>
+                                <option value="300" selected>Every 5 minutes (Standard)</option>
+                                <option value="600">Every 10 minutes</option>
+                                <option value="900">Every 15 minutes</option>
+                                <option value="1800">Every 30 minutes</option>
+                                <option value="3600">Every 1 hour</option>
+                                <option value="21600">Every 6 hours (Database Keep-Alive)</option>
+                                <option value="86400">Every 24 hours (Daily)</option>
+                            </select>
+                        </div>
+                        <div class="form-group col-6">
+                            <label for="monTimeout">Timeout (seconds)</label>
+                            <input type="number" id="monTimeout" class="form-control" value="6" min="1" max="30">
+                        </div>
+                    </div>
+
+                    <!-- HTTP Fields (Supports all methods: GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS) -->
+                    <div id="httpFieldsGroup">
+                        <div class="form-row">
+                            <div class="form-group col-4">
+                                <label for="monMethod">HTTP Method *</label>
+                                <select id="monMethod" class="form-control" onchange="handleMethodChange()">
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                    <option value="HEAD">HEAD</option>
+                                    <option value="PUT">PUT</option>
+                                    <option value="DELETE">DELETE</option>
+                                    <option value="PATCH">PATCH</option>
+                                    <option value="OPTIONS">OPTIONS</option>
+                                </select>
+                            </div>
+                            <div class="form-group col-8">
+                                <label for="monUrl">Target URL *</label>
+                                <input type="url" id="monUrl" class="form-control" placeholder="https://my-app.onrender.com/health">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="monExpectedStatus">Expected HTTP Status(es)</label>
+                            <input type="text" id="monExpectedStatus" class="form-control" value="200" placeholder="e.g. 200, 201, 204, 301">
+                        </div>
+
+                        <!-- Custom HTTP Headers -->
+                        <div class="form-group">
+                            <label for="monHeaders">Custom HTTP Headers (JSON format optional)</label>
+                            <input type="text" id="monHeaders" class="form-control" placeholder='{"Authorization": "Bearer token", "Content-Type": "application/json"}'>
+                        </div>
+
+                        <!-- Request Body (Visible for POST, PUT, PATCH, DELETE) -->
+                        <div class="form-group" id="bodyFieldGroup">
+                            <label for="monBody">Request Body Payload (JSON or Raw Text)</label>
+                            <textarea id="monBody" class="form-control form-textarea" rows="3" placeholder='{"query": "{ health { status } }"}'></textarea>
+                        </div>
+                    </div>
+
+                    <!-- TCP Database Fields -->
+                    <div id="tcpFieldsGroup" class="hidden">
+                        <div class="form-row">
+                            <div class="form-group col-8">
+                                <label for="monHost">Host / Endpoint *</label>
+                                <input type="text" id="monHost" class="form-control" placeholder="db.abcdefg.supabase.co">
+                            </div>
+                            <div class="form-group col-4">
+                                <label for="monPort">Port *</label>
+                                <input type="number" id="monPort" class="form-control" value="5432" placeholder="5432, 3306, 6379">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="monKeepAliveNote">Keep-Alive & Sleep Prevention Note</label>
+                        <input type="text" id="monKeepAliveNote" class="form-control" placeholder="e.g. Prevents Render 15-min spin-down, Keeps Supabase active">
+                    </div>
+
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="closeMonitorModal()">Cancel</button>
+                        <button type="submit" class="btn btn-add" id="saveMonitorBtn">Save Monitor</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Toast Notifications -->
+        <div class="toast-container" id="toastContainer"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>
