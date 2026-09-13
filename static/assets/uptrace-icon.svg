@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none">
+  <defs>
+    <linearGradient id="uptGlow" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#5b63d3" />
+      <stop offset="100%" stop-color="#98a4f7" />
+    </linearGradient>
+    <linearGradient id="uptSurface" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1c1f2e" />
+      <stop offset="100%" stop-color="#11121c" />
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#5b63d3" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Squircle Base -->
+  <rect x="2" y="2" width="44" height="44" rx="12" fill="url(#uptSurface)" stroke="#2d3348" stroke-width="1.5" />
+  
+  <!-- Subtle Top Highlight Rim -->
+  <path d="M 6 12 C 6 8.5 8.5 6 12 6 L 36 6 C 39.5 6 42 8.5 42 12" stroke="#ffffff" stroke-width="1" stroke-opacity="0.15" fill="none" />
+
+  <!-- Synthetic Pulse & Keep-Alive Trace Mark -->
+  <path d="M 10 25 L 17 25 L 21 15 L 27 33 L 31 23 L 38 23" 
+        stroke="url(#uptGlow)" 
+        stroke-width="3.2" 
+        stroke-linecap="round" 
+        stroke-linejoin="round" 
+        filter="url(#glow)" />
+  
+  <!-- Active Telemetry Pulse Node -->
+  <circle cx="38" cy="23" r="2.5" fill="#ffffff" />
+</svg>
