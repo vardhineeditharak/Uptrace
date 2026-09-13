@@ -1173,6 +1173,6 @@ if __name__ == '__main__':
     checker_thread = threading.Thread(target=background_checker_job, daemon=True)
     checker_thread.start()
 
-    port = int(os.getenv('PORT', '5000'))
-    logger.info(f"🚀 Starting Uptrace SaaS Server on http://localhost:{port}")
-    app.run(debug=True, port=port, use_reloader=False)
+    port = int(os.getenv('PORT', '8000'))
+    logger.info(f"🚀 Starting Uptrace SaaS Server on port {port}")
+    app.run(host='0.0.0.0', port=port, debug=False, use_reloader=False)
