@@ -17,10 +17,10 @@ __pycache__/
 !.env.example
 
 # Runtime Log files & Databases
-logs/
-*.log
-data/
-data/uptime_history.json
+# logs/
+# *.log
+# data/
+# data/uptime_history.json
 
 # Live Status & Telemetry (prevents local test run commits)
 STATUS.md
