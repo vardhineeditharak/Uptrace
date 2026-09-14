@@ -24,6 +24,23 @@
       "expected_status": [
         200
       ]
+    },
+    {
+      "id": "mon-1789385800",
+      "name": "PrepWise AI (Database Keep-Alive)",
+      "environment": "production",
+      "type": "http",
+      "category": "Databases (Keep-Alive)",
+      "keep_alive_note": "Keeps PrepWise AI serverless database & Vercel API warm",
+      "interval_seconds": 300,
+      "timeout": 6,
+      "paused": false,
+      "url": "https://prepwise-ai-blue.vercel.app/api/keep-alive?key=my-database-keep-alive-secret-12345",
+      "method": "GET",
+      "headers": {},
+      "expected_status": [
+        200
+      ]
     }
   ]
 }
