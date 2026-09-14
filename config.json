@@ -2,9 +2,9 @@
   "project_name": "Uptrace",
   "version": "2.3.0",
   "settings": {
-    "default_timeout_seconds": 6,
+    "default_timeout_seconds": 15,
     "max_concurrent_workers": 8,
-    "default_check_interval_seconds": 300,
+    "default_check_interval_seconds": 3600,
     "incident_cooldown_minutes": 15
   },
   "services": [
@@ -16,7 +16,7 @@
       "category": "Web Applications",
       "keep_alive_note": "Keeps Tiny-To database query engine & Vercel serverless function warm",
       "interval_seconds": 900,
-      "timeout": 6,
+      "timeout": 15,
       "paused": false,
       "url": "https://tiny-to.vercel.app/ooZi6",
       "method": "GET",
