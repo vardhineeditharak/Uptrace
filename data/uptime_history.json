@@ -88,5 +88,31 @@
         "method": "GET"
       }
     }
+  },
+  {
+    "timestamp": "2026-09-14 17:08:56",
+    "total": 3,
+    "healthy": 3,
+    "unhealthy": 0,
+    "services": {
+      "mon-1789384408": {
+        "status": "healthy",
+        "latency": 683.08,
+        "env": "production",
+        "method": "GET"
+      },
+      "mon-1789385800": {
+        "status": "healthy",
+        "latency": 1146.42,
+        "env": "production",
+        "method": "GET"
+      },
+      "mon-1789385907": {
+        "status": "healthy",
+        "latency": 279.16,
+        "env": "production",
+        "method": "GET"
+      }
+    }
   }
 ]
