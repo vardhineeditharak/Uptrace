@@ -69,15 +69,16 @@
       "type": "http",
       "category": "Web Applications",
       "keep_alive_note": "Keeps Weather Forecaster Vercel deployment active and responsive",
-      "interval_seconds": 86400,
-      "timeout": 15,
+      "interval_seconds": 300,
+      "timeout": 6,
       "paused": false,
       "url": "https://weather-forecaster-one.vercel.app/",
       "method": "GET",
       "headers": {},
       "expected_status": [
         200
-      ]
+      ],
+      "body": ""
     }
   ]
 }
