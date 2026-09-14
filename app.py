@@ -1015,8 +1015,8 @@ Automated synthetic health check and keep-alive ping report. This file is contin
                 repo_url = f"https://x-access-token:{gh_token}@github.com/vardhineeditharak/Uptrace.git"
                 subprocess.run(["git", "remote", "set-url", "origin", repo_url], capture_output=True, text=True)
 
-            user_name = os.getenv('GIT_COMMIT_AUTHOR_NAME', 'Uptrace Bot')
-            user_email = os.getenv('GIT_COMMIT_AUTHOR_EMAIL', 'uptrace-bot@users.noreply.github.com')
+            user_name = os.getenv('GIT_COMMIT_AUTHOR_NAME', 'vardhineeditharak')
+            user_email = os.getenv('GIT_COMMIT_AUTHOR_EMAIL', 'vardhineedi.tharak@gmail.com')
             subprocess.run(["git", "config", "user.name", user_name], capture_output=True, text=True)
             subprocess.run(["git", "config", "user.email", user_email], capture_output=True, text=True)
 
