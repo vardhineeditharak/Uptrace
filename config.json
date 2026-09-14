@@ -41,6 +41,23 @@
       "expected_status": [
         200
       ]
+    },
+    {
+      "id": "mon-1789385907",
+      "name": "Bolt Note (Web App)",
+      "environment": "production",
+      "type": "http",
+      "category": "Web Applications",
+      "keep_alive_note": "Keeps Bolt Note Vercel deployment active and responsive",
+      "interval_seconds": 3600,
+      "timeout": 15,
+      "paused": false,
+      "url": "https://bolt-note-one.vercel.app/",
+      "method": "GET",
+      "headers": {},
+      "expected_status": [
+        200
+      ]
     }
   ]
 }
