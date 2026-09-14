@@ -7,5 +7,23 @@
     "default_check_interval_seconds": 300,
     "incident_cooldown_minutes": 15
   },
-  "services": []
+  "services": [
+    {
+      "id": "mon-1789384408",
+      "name": "tiny-to (Web & Database)",
+      "environment": "production",
+      "type": "http",
+      "category": "Web Applications",
+      "keep_alive_note": "Keeps Tiny-To database query engine & Vercel serverless function warm",
+      "interval_seconds": 300,
+      "timeout": 30,
+      "paused": false,
+      "url": "https://tiny-to.vercel.app/ooZi6",
+      "method": "GET",
+      "headers": {},
+      "expected_status": [
+        200
+      ]
+    }
+  ]
 }
