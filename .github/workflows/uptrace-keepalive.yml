@@ -1,4 +1,4 @@
-name: ⚡ Uptrace Keep-Alive & Commit Streak
+name: ⚡ Uptrace Keep-Alive & Auto Commit logs
 
 on:
   schedule:
