@@ -36,6 +36,9 @@ jobs:
 
       - name: ⚡ Run Uptrace Keep-Alive Checks & Alerts
         env:
+          TZ: 'Asia/Kolkata'
+          TIMEZONE: 'Asia/Kolkata'
+          TIMEZONE_CODE: 'IST'
           SMTP_ENABLED: ${{ secrets.SMTP_ENABLED || 'false' }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
@@ -48,6 +51,8 @@ jobs:
           python run_monitor.py --no-commit || echo "Checks completed"
 
       - name: 📊 Commit & Push Status Report, History & Logs to GitHub
+        env:
+          TZ: 'Asia/Kolkata'
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -55,7 +60,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes in status report."
           else
-            TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+            TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S IST")
             git commit -m "chore(uptrace): automated keep-alive status sync [$TIMESTAMP]"
             git push origin HEAD
           fi

@@ -10,6 +10,7 @@ import subprocess
 import base64
 from urllib.parse import urlparse
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -22,6 +23,19 @@ from flask import Flask, render_template, jsonify, request, session, redirect, u
 
 # Load environment variables
 load_dotenv()
+
+def get_tz():
+    tz_str = os.getenv('TIMEZONE', os.getenv('TZ', 'Asia/Kolkata')).strip()
+    try:
+        return ZoneInfo(tz_str)
+    except Exception:
+        return timezone.utc
+
+def get_now():
+    return datetime.now(get_tz())
+
+def get_now_str(fmt='%Y-%m-%d %H:%M:%S'):
+    return get_now().strftime(fmt)
 
 # Ensure UTF-8 output in Windows consoles
 if sys.platform == 'win32':
@@ -37,14 +51,23 @@ if sys.platform == 'win32':
 os.makedirs('logs', exist_ok=True)
 os.makedirs('data', exist_ok=True)
 
-# Configure logging
+class TimezoneFormatter(logging.Formatter):
+    def formatTime(self, record, datefmt=None):
+        dt = datetime.fromtimestamp(record.created, get_tz())
+        if datefmt:
+            return dt.strftime(datefmt)
+        return dt.strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
+
+# Configure logging with local timezone
+log_handler_file = logging.FileHandler('logs/uptrace.log', encoding='utf-8')
+log_handler_stream = logging.StreamHandler(sys.stdout)
+tz_fmt = TimezoneFormatter('%(asctime)s [%(levelname)s] %(message)s')
+log_handler_file.setFormatter(tz_fmt)
+log_handler_stream.setFormatter(tz_fmt)
+
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler('logs/uptrace.log', encoding='utf-8'),
-        logging.StreamHandler(sys.stdout)
-    ]
+    handlers=[log_handler_file, log_handler_stream]
 )
 logger = logging.getLogger('Uptrace')
 
@@ -856,7 +879,7 @@ class UptraceEngine:
 
     def save_history(self, results):
         entry = {
-            'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'timestamp': get_now_str('%Y-%m-%d %H:%M:%S'),
             'total': len(results),
             'healthy': len([r for r in results if r['status'] == 'healthy']),
             'unhealthy': len([r for r in results if r['status'] in ['unhealthy', 'error']]),
@@ -885,7 +908,8 @@ class UptraceEngine:
         total = len(results)
         healthy = len([r for r in results if r['status'] == 'healthy'])
         unhealthy = total - healthy
-        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
+        tz_code = os.getenv('TIMEZONE_CODE', 'IST')
+        now_str = get_now_str(f'%Y-%m-%d %H:%M:%S {tz_code}')
 
         overall_badge = "https://img.shields.io/badge/Status-Operational-brightgreen" if unhealthy == 0 else "https://img.shields.io/badge/Status-Degraded-red"
         
