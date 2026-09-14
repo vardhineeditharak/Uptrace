@@ -105,3 +105,14 @@
 2026-09-14 20:55:19,043 [WARNING] 🚨 INCIDENT TRIGGERED for [PRODUCTION] Weather Forecaster (Web Application): HTTPSConnectionPool(host='weather-forecaster-one.vercel.app', port=443): Max retries exceeded with url: / (Caused by ResponseError('too many 503 error responses'))
 2026-09-14 20:55:19,088 [INFO] 📊 Run Complete: 4/5 services operational (1 issues).
 2026-09-14 20:55:19,088 [INFO] ✨ Uptrace Run Finished.
+2026-09-14 20:55:52,382 [INFO] ============================================================
+2026-09-14 20:55:52,382 [INFO] ⚡ Starting Uptrace Headless Monitor Run
+2026-09-14 20:55:52,383 [INFO] ============================================================
+2026-09-14 20:55:52,794 [INFO] ✅ [GET][PRODUCTION][300s] Bolt Note (Web App) - HEALTHY (220.03ms) - 200
+2026-09-14 20:55:52,838 [INFO] ✅ [GET][PRODUCTION][300s] FinGuide-Ai (Web App) - HEALTHY (269.13ms) - 200
+2026-09-14 20:55:52,968 [ERROR] ❌ [GET][PRODUCTION] Weather Forecaster (Web Application) - ERROR: HTTPSConnectionPool(host='weather-forecaster-one.vercel.app', port=443): Max retries exceeded with url: / (Caused by ResponseError('too many 503 error responses'))
+2026-09-14 20:55:53,391 [INFO] ✅ [GET][PRODUCTION][300s] tiny-to (Web & Database) - HEALTHY (832.29ms) - 200
+2026-09-14 20:55:53,552 [INFO] ✅ [GET][PRODUCTION][300s] PrepWise AI (Database Keep-Alive) - HEALTHY (991.67ms) - 200
+2026-09-14 20:55:53,553 [WARNING] 🚨 INCIDENT TRIGGERED for [PRODUCTION] Weather Forecaster (Web Application): HTTPSConnectionPool(host='weather-forecaster-one.vercel.app', port=443): Max retries exceeded with url: / (Caused by ResponseError('too many 503 error responses'))
+2026-09-14 20:55:53,554 [INFO] 📊 Run Complete: 4/5 services operational (1 issues).
+2026-09-14 20:55:53,554 [INFO] ✨ Uptrace Run Finished.

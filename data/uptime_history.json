@@ -320,5 +320,43 @@
         "method": "GET"
       }
     }
+  },
+  {
+    "timestamp": "2026-09-14 20:55:53",
+    "total": 5,
+    "healthy": 4,
+    "unhealthy": 1,
+    "services": {
+      "mon-1789384408": {
+        "status": "healthy",
+        "latency": 832.29,
+        "env": "production",
+        "method": "GET"
+      },
+      "mon-1789385800": {
+        "status": "healthy",
+        "latency": 991.67,
+        "env": "production",
+        "method": "GET"
+      },
+      "mon-1789385907": {
+        "status": "healthy",
+        "latency": 220.03,
+        "env": "production",
+        "method": "GET"
+      },
+      "mon-1789398914": {
+        "status": "error",
+        "latency": 395.92,
+        "env": "production",
+        "method": "GET"
+      },
+      "mon-1789399530": {
+        "status": "healthy",
+        "latency": 269.13,
+        "env": "production",
+        "method": "GET"
+      }
+    }
   }
 ]
