@@ -896,7 +896,8 @@ Automated synthetic health check and keep-alive ping report. This file is contin
         commit_msg = f"chore(uptrace): automated health check & keep-alive ping [{timestamp}]"
 
         try:
-            subprocess.run(["git", "add", STATUS_MD_FILE, HISTORY_FILE, "logs/"], check=True, capture_output=True, text=True)
+            subprocess.run(["git", "add", CONFIG_FILE], capture_output=True, text=True)
+            subprocess.run(["git", "add", "-f", STATUS_MD_FILE], capture_output=True, text=True)
             res = subprocess.run(["git", "commit", "-m", commit_msg], capture_output=True, text=True)
             if res.returncode == 0:
                 logger.info(f"🌱 Git commit successful: '{commit_msg}'")
