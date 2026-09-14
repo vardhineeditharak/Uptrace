@@ -1,22 +1,4 @@
 # Uptrace Runtime Log
-2026-09-14 11:13:43,016 [INFO] ============================================================
-2026-09-14 11:13:43,016 [INFO] ⚡ Starting Uptrace Headless Monitor Run
-2026-09-14 11:13:43,016 [INFO] ============================================================
-2026-09-14 11:13:44,718 [INFO] ✅ [GET][PRODUCTION][300s] tiny-to (Web & Database) - HEALTHY (1587.8ms) - 200
-2026-09-14 11:13:44,720 [INFO] 📊 Run Complete: 1/1 services operational (0 issues).
-2026-09-14 11:13:44,720 [INFO] ✨ Uptrace Run Finished.
-2026-09-14 11:15:28,352 [INFO] ============================================================
-2026-09-14 11:15:28,352 [INFO] ⚡ Starting Uptrace Headless Monitor Run
-2026-09-14 11:15:28,352 [INFO] ============================================================
-2026-09-14 11:15:30,295 [INFO] ✅ [GET][PRODUCTION][300s] tiny-to (Web & Database) - HEALTHY (1852.37ms) - 200
-2026-09-14 11:15:30,298 [INFO] 📊 Run Complete: 1/1 services operational (0 issues).
-2026-09-14 11:15:30,298 [INFO] ✨ Uptrace Run Finished.
-2026-09-14 11:16:36,726 [INFO] ============================================================
-2026-09-14 11:16:36,726 [INFO] ⚡ Starting Uptrace Headless Monitor Run
-2026-09-14 11:16:36,726 [INFO] ============================================================
-2026-09-14 11:16:37,788 [INFO] ✅ [GET][PRODUCTION][300s] tiny-to (Web & Database) - HEALTHY (959.36ms) - 200
-2026-09-14 11:16:37,790 [INFO] 📊 Run Complete: 1/1 services operational (0 issues).
-2026-09-14 11:16:37,790 [INFO] ✨ Uptrace Run Finished.
 2026-09-14 16:49:17,552 [INFO] ============================================================
 2026-09-14 16:49:17,552 [INFO] ⚡ Starting Uptrace Headless Monitor Run
 2026-09-14 16:49:17,552 [INFO] ============================================================
