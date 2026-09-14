@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In — Uptrace SRE Console</title>
+    <meta name="description" content="Secure login to Uptrace Midnight SRE Console for synthetic keep-alive and incident monitoring.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='assets/favicon.svg') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="login-body">
+    <div class="login-wrapper">
+        <div class="login-card">
+            <!-- Brand Header -->
+            <div class="login-brand">
+                <div class="brand-icon-wrapper login-icon-glow">
+                    <img src="{{ url_for('static', filename='assets/uptrace-icon.svg') }}" alt="Uptrace" class="brand-icon-svg" width="48" height="48">
+                </div>
+                <div class="login-brand-titles">
+                    <div class="brand-title-row" style="justify-content: center;">
+                        <h1 class="login-title">Uptrace</h1>
+                        <span class="sre-badge">SRE CONSOLE</span>
+                    </div>
+                    <p class="login-subtitle">Synthetic Keep-Alive & Cloud Incident Monitoring</p>
+                </div>
+            </div>
+
+            <!-- Error Banner -->
+            {% if error %}
+            <div class="login-alert login-alert-error" role="alert">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>{{ error }}</span>
+            </div>
+            {% endif %}
+
+            <!-- Password Form -->
+            <form action="{{ url_for('login_page') }}" method="POST" class="login-form">
+                <div class="form-group">
+                    <label for="admin_password" class="form-label">
+                        <span>Access Password</span>
+                        <span class="form-hint-tag">Master Key</span>
+                    </label>
+                    <div class="input-with-icon">
+                        <svg class="input-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <input 
+                            type="password" 
+                            id="admin_password" 
+                            name="password" 
+                            class="form-control" 
+                            placeholder="Enter master password..." 
+                            required 
+                            autofocus
+                            autocomplete="current-password"
+                        >
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-add btn-login-submit">
+                    <span>Authenticate & Access Console</span>
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                </button>
+            </form>
+
+            <!-- Divider if OAuth or Demo is available -->
+            {% if has_github_oauth or enable_demo %}
+            <div class="login-divider">
+                <span>OR SIGN IN WITH</span>
+            </div>
+            {% endif %}
+
+            <div class="login-alt-actions">
+                {% if has_github_oauth %}
+                <a href="{{ url_for('github_login') }}" class="btn btn-secondary btn-login-alt">
+                    <svg class="svg-icon" viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                        <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+                    </svg>
+                    <span>GitHub Account</span>
+                </a>
+                {% endif %}
+
+                {% if enable_demo %}
+                <a href="{{ url_for('demo_login') }}" class="btn btn-secondary btn-login-alt btn-demo-login">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span>1-Click Demo Access</span>
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- Security Badge Footer -->
+            <div class="login-footer">
+                <div class="security-indicator">
+                    <span class="pulse-dot"></span>
+                    <span>256-Bit Encrypted TLS & Session Guard Active</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

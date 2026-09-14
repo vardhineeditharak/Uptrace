@@ -1301,3 +1301,308 @@ body {
   .footer-top { flex-direction: column; }
   .footer-links-group { gap: 24px; }
 }
+
+/* ==========================================================================
+   User Profile Badge in Navbar
+   ========================================================================== */
+.user-profile-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-gunmetal);
+  border: 1px solid rgba(147, 157, 184, 0.2);
+  padding: 4px 10px 4px 6px;
+  border-radius: var(--radius-buttons);
+}
+
+.user-avatar {
+  border-radius: 50%;
+  border: 1px solid var(--color-iris-blue);
+  object-fit: cover;
+}
+
+.user-name {
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-frost);
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-role-badge {
+  font-size: 10px;
+  font-weight: var(--font-weight-bold);
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.user-role-badge.demo-badge {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--color-status-warning);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.user-role-badge.admin-badge {
+  background: rgba(91, 99, 211, 0.2);
+  color: var(--color-periwinkle-glow);
+  border: 1px solid rgba(91, 99, 211, 0.4);
+}
+
+.user-role-badge.github-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--color-status-healthy);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.btn-logout-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-muted-steel);
+  margin-left: 2px;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  text-decoration: none;
+}
+
+.btn-logout-link:hover {
+  color: var(--color-status-danger);
+  background: rgba(244, 63, 94, 0.12);
+}
+
+/* ==========================================================================
+   Midnight SRE Login Page
+   ========================================================================== */
+.login-body {
+  background-color: var(--color-void-black);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-image: 
+    radial-gradient(ellipse at 50% 15%, rgba(91, 99, 211, 0.15) 0%, transparent 60%),
+    radial-gradient(circle at 80% 80%, rgba(124, 135, 247, 0.06) 0%, transparent 40%);
+  background-attachment: fixed;
+}
+
+.login-wrapper {
+  width: 100%;
+  max-width: 440px;
+  padding: 24px;
+  margin: 0 auto;
+}
+
+.login-card {
+  background: var(--color-carbon-surface);
+  border: 1px solid rgba(147, 157, 184, 0.18);
+  border-radius: var(--radius-cards);
+  box-shadow: 
+    var(--shadow-subtle),
+    0 24px 48px -12px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(255, 255, 255, 0.03);
+  padding: 36px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+
+.login-icon-glow {
+  position: relative;
+}
+
+.login-icon-glow::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  background: radial-gradient(circle, rgba(91, 99, 211, 0.4) 0%, transparent 70%);
+  z-index: -1;
+  border-radius: 50%;
+}
+
+.login-brand-titles {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.login-title {
+  font-size: 26px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-pure-white);
+  letter-spacing: -0.02em;
+}
+
+.login-subtitle {
+  font-size: 13px;
+  color: var(--color-muted-steel);
+}
+
+.login-alert {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-inputs);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.login-alert-error {
+  background: rgba(244, 63, 94, 0.12);
+  border: 1px solid rgba(244, 63, 94, 0.35);
+  color: #fda4af;
+}
+
+.login-alert svg {
+  flex-shrink: 0;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-hint-tag {
+  font-size: 11px;
+  color: var(--color-muted-steel);
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--color-gunmetal);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--color-muted-steel);
+  pointer-events: none;
+}
+
+.input-with-icon .form-control {
+  padding-left: 42px;
+  font-size: 14px;
+}
+
+.btn-login-submit {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-top: 4px;
+  transition: all 0.2s ease;
+}
+
+.btn-login-submit:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: var(--color-muted-steel);
+  font-size: 11px;
+  font-weight: var(--font-weight-bold);
+  letter-spacing: 0.08em;
+  margin: 4px 0;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid rgba(147, 157, 184, 0.15);
+}
+
+.login-divider span {
+  padding: 0 12px;
+}
+
+.login-alt-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.btn-login-alt {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 10px 16px;
+  font-size: 13px;
+  text-decoration: none;
+  border-radius: var(--radius-buttons);
+}
+
+.btn-login-alt:hover {
+  background: rgba(147, 157, 184, 0.15);
+  border-color: var(--color-steel-border);
+}
+
+.btn-demo-login {
+  border-color: rgba(245, 158, 11, 0.35);
+  color: #fde68a;
+}
+
+.btn-demo-login:hover {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: var(--color-status-warning);
+}
+
+.login-footer {
+  border-top: 1px solid rgba(147, 157, 184, 0.12);
+  padding-top: 18px;
+  display: flex;
+  justify-content: center;
+}
+
+.security-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-muted-steel);
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.security-indicator .pulse-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--color-status-healthy);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--color-status-healthy);
+  animation: pulseGlow 2s infinite ease-in-out;
+}
+
+@keyframes pulseGlow {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}

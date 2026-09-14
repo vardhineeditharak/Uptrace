@@ -18,6 +18,8 @@ from functools import wraps
 import smtplib
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from dotenv import load_dotenv
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, Response
 
@@ -75,8 +77,11 @@ CONFIG_FILE = 'config.json'
 HISTORY_FILE = os.path.join('data', 'uptime_history.json')
 STATUS_MD_FILE = 'STATUS.md'
 
+_ssl_cache = {}
+_ssl_cache_lock = threading.Lock()
+
 def get_ssl_info(url):
-    """Inspects SSL certificate for HTTPS URLs to calculate expiration days"""
+    """Inspects SSL certificate for HTTPS URLs to calculate expiration days with TTL in-memory caching"""
     try:
         parsed = urlparse(url)
         if parsed.scheme != 'https':
@@ -84,6 +89,13 @@ def get_ssl_info(url):
         
         hostname = parsed.hostname
         port = parsed.port or 443
+        cache_key = f"{hostname}:{port}"
+
+        # 6-hour SSL certificate TTL cache
+        with _ssl_cache_lock:
+            cached = _ssl_cache.get(cache_key)
+            if cached and (time.time() - cached['cached_at']) < 21600:
+                return cached['data']
         
         ctx = ssl.create_default_context()
         with socket.create_connection((hostname, port), timeout=4) as sock:
@@ -93,12 +105,15 @@ def get_ssl_info(url):
                 if not_after_str:
                     expiry_date = datetime.strptime(not_after_str, '%b %d %H:%M:%S %Y %Z').replace(tzinfo=timezone.utc)
                     days_left = (expiry_date - datetime.now(timezone.utc)).days
-                    return {
+                    data = {
                         'valid': days_left > 0,
                         'days_left': max(0, days_left),
                         'expiry_date': expiry_date.strftime('%Y-%m-%d'),
                         'issuer': dict(x[0] for x in cert.get('issuer', [])).get('organizationName', 'SSL Provider')
                     }
+                    with _ssl_cache_lock:
+                        _ssl_cache[cache_key] = {'data': data, 'cached_at': time.time()}
+                    return data
     except Exception as e:
         logger.debug(f"SSL check note for {url}: {e}")
         return None
@@ -109,6 +124,7 @@ class UptraceEngine:
     Uptrace Core Engine
     - Multi-method HTTP keep-alive pings (GET, POST, HEAD, PUT, DELETE, PATCH, OPTIONS)
     - Database socket & TCP keep-alive pings
+    - Connection-pooled persistent sessions for high throughput
     - Per-monitor custom ping scheduling
     - Environment segregation (Production vs Staging vs Development)
     - Multi-channel alerts (Email, Discord, Telegram, Slack)
@@ -121,6 +137,16 @@ class UptraceEngine:
         self.service_last_run = {}
         self.last_check_time = None
         self.lock = threading.Lock()
+
+        # Connection-pooled persistent HTTP session
+        self.session = requests.Session()
+        adapter = HTTPAdapter(
+            pool_connections=30,
+            pool_maxsize=100,
+            max_retries=Retry(total=1, backoff_factor=0.2, status_forcelist=[502, 503, 504])
+        )
+        self.session.mount('https://', adapter)
+        self.session.mount('http://', adapter)
         
     def load_config(self):
         try:
@@ -360,8 +386,8 @@ class UptraceEngine:
 
         start_time = time.time()
         try:
-            # Execute request according to configured HTTP method
-            response = requests.request(
+            # Execute request according to configured HTTP method using persistent pooled session
+            response = self.session.request(
                 method=method,
                 url=url,
                 headers=headers,
@@ -1039,9 +1065,47 @@ app.secret_key = os.getenv('SECRET_KEY', 'uptrace-super-secret-key-session')
 
 # --- GITHUB OAUTH & AUTHENTICATION ROUTES ---
 
-@app.route('/login')
+@app.after_request
+def add_security_and_cache_headers(response):
+    if request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+    else:
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
+
+@app.route('/login', methods=['GET', 'POST'])
 def login_page():
-    return redirect(url_for('github_login'))
+    if session.get('user'):
+        return redirect('/')
+
+    error = None
+    if request.method == 'POST':
+        entered_password = request.form.get('password', '').strip()
+        configured_password = os.getenv('ADMIN_PASSWORD', 'admin123').strip()
+
+        if configured_password and entered_password == configured_password:
+            session['user'] = {
+                'login': 'admin',
+                'name': 'Administrator',
+                'avatar_url': 'https://avatars.githubusercontent.com/u/9919?s=200&v=4',
+                'html_url': 'https://github.com',
+                'is_admin_pass': True,
+                'is_demo': False
+            }
+            logger.info("👤 Admin authenticated via Master Password")
+            return redirect('/')
+        else:
+            error = "Invalid master password. Please verify your credentials."
+
+    has_github_oauth = bool(os.getenv('GITHUB_CLIENT_ID') and os.getenv('GITHUB_CLIENT_SECRET'))
+    enable_demo = os.getenv('ENABLE_DEMO_LOGIN', 'true').lower() in ('true', '1', 'yes')
+
+    return render_template(
+        'login.html',
+        error=error,
+        has_github_oauth=has_github_oauth,
+        enable_demo=enable_demo
+    )
 
 @app.route('/login/github')
 def github_login():
@@ -1135,7 +1199,7 @@ def demo_login():
 @app.route('/logout')
 def logout():
     session.pop('user', None)
-    return redirect('/')
+    return redirect(url_for('login_page'))
 
 @app.route('/api/me')
 def api_me():
@@ -1149,11 +1213,11 @@ def api_me():
 def login_required_if_enabled(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        require_auth = os.getenv('REQUIRE_AUTH', 'false').lower() in ('true', '1', 'yes')
+        require_auth = os.getenv('REQUIRE_AUTH', 'true').lower() in ('true', '1', 'yes')
         if require_auth and not session.get('user'):
             if request.path.startswith('/api/'):
-                return jsonify({'error': 'Unauthorized: Please log in with GitHub to access this private console.'}), 401
-            return redirect(url_for('github_login'))
+                return jsonify({'error': 'Unauthorized: Please log in to access this private SRE console.'}), 401
+            return redirect(url_for('login_page'))
         return f(*args, **kwargs)
     return decorated_function
 
@@ -1257,6 +1321,7 @@ def api_trigger_git_commit():
     return jsonify(res)
 
 @app.route('/api/history')
+@login_required_if_enabled
 def api_history():
     if os.path.exists(HISTORY_FILE):
         try:
@@ -1268,6 +1333,7 @@ def api_history():
     return jsonify({'history': []})
 
 @app.route('/api/incidents')
+@login_required_if_enabled
 def api_incidents():
     return jsonify({'incidents': monitor.incident_state})
 
