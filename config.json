@@ -15,15 +15,16 @@
       "type": "http",
       "category": "Web Applications",
       "keep_alive_note": "Keeps Tiny-To database query engine & Vercel serverless function warm",
-      "interval_seconds": 300,
-      "timeout": 30,
+      "interval_seconds": 900,
+      "timeout": 6,
       "paused": false,
       "url": "https://tiny-to.vercel.app/ooZi6",
       "method": "GET",
       "headers": {},
       "expected_status": [
         200
-      ]
+      ],
+      "body": ""
     },
     {
       "id": "mon-1789385800",
