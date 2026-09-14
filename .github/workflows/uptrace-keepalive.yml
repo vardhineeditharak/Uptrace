@@ -2,7 +2,7 @@ name: ⚡ Uptrace Keep-Alive & Auto Commit logs
 
 on:
   schedule:
-    # Runs every 6 hours (00:00, 06:00, 12:00, 18:00 UTC) to keep DBs/Apps awake and grow commit graph
+    # Runs every 6 hours (00:00, 06:00, 12:00, 18:00 UTC)
     - cron: '0 */6 * * *'
   workflow_dispatch: # Allows manual trigger from GitHub Actions tab
   push:
@@ -43,18 +43,19 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           ALERT_SENDER_EMAIL: ${{ secrets.ALERT_SENDER_EMAIL }}
           ALERT_RECEIVER_EMAIL: ${{ secrets.ALERT_RECEIVER_EMAIL }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          python run_monitor.py --no-commit || echo "Checks completed with incidents reported"
+          python run_monitor.py --no-commit || echo "Checks completed"
 
-      - name: 🌱 Commit & Push Status Report to GitHub
+      - name: 📊 Commit & Push Status Report to GitHub
         run: |
-          git config --global user.name "Uptrace Bot"
-          git config --global user.email "uptrace-bot@users.noreply.github.com"
-          git add STATUS.md data/ logs/
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f STATUS.md 2>/dev/null || true
           if git diff --staged --quiet; then
             echo "No changes in status report."
           else
             TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-            git commit -m "chore(uptrace): automated keep-alive check & status report [$TIMESTAMP]"
+            git commit -m "chore(uptrace): automated keep-alive status sync [$TIMESTAMP]"
             git push origin HEAD
           fi
