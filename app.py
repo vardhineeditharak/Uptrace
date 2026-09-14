@@ -7,6 +7,7 @@ import ssl
 import logging
 import threading
 import subprocess
+import base64
 from urllib.parse import urlparse
 from datetime import datetime, timezone
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -111,11 +112,65 @@ class UptraceEngine:
                 "services": []
             }
 
+    def sync_file_to_github(self, file_path, commit_message="chore(uptrace): automated file sync"):
+        """Commits file directly to GitHub via REST API without requiring local git binary or .git folder"""
+        token = os.getenv('GITHUB_TOKEN')
+        if not token:
+            return False
+
+        repo = os.getenv('GITHUB_REPOSITORY', 'vardhineeditharak/Uptrace').strip()
+        url = f"https://api.github.com/repos/{repo}/contents/{file_path}"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "Uptrace-SRE-Console"
+        }
+
+        try:
+            if not os.path.exists(file_path):
+                return False
+
+            with open(file_path, 'rb') as f:
+                content_bytes = f.read()
+            content_b64 = base64.b64encode(content_bytes).decode('utf-8')
+
+            # Fetch existing file SHA if present on GitHub
+            get_res = requests.get(url, headers=headers, timeout=10)
+            sha = get_res.json().get('sha') if get_res.status_code == 200 else None
+
+            payload = {
+                "message": commit_message,
+                "content": content_b64,
+                "branch": "main"
+            }
+            if sha:
+                payload["sha"] = sha
+
+            put_res = requests.put(url, headers=headers, json=payload, timeout=12)
+            if put_res.status_code in (200, 201):
+                logger.info(f"🚀 GitHub API: Committed {file_path} to remote repository successfully!")
+                return True
+            else:
+                logger.warning(f"GitHub API commit notice for {file_path}: {put_res.status_code} {put_res.text}")
+                return False
+        except Exception as e:
+            logger.error(f"GitHub API sync error for {file_path}: {e}")
+            return False
+
     def save_config(self):
         try:
             with open(self.config_path, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, indent=2)
             logger.info("Saved updated configuration to config.json")
+            
+            # Sync to GitHub if GITHUB_TOKEN is available
+            if os.getenv('GITHUB_TOKEN'):
+                threading.Thread(
+                    target=self.sync_file_to_github, 
+                    args=(self.config_path, "chore(uptrace): update config.json via Web UI"),
+                    daemon=True
+                ).start()
+
             return True
         except Exception as e:
             logger.error(f"Failed to save {self.config_path}: {e}")
@@ -895,17 +950,26 @@ Automated synthetic health check and keep-alive ping report. This file is contin
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         commit_msg = f"chore(uptrace): automated health check & keep-alive ping [{timestamp}]"
 
-        gh_token = os.getenv('GITHUB_TOKEN')
-        if gh_token:
-            repo_url = f"https://x-access-token:{gh_token}@github.com/vardhineeditharak/Uptrace.git"
-            subprocess.run(["git", "remote", "set-url", "origin", repo_url], capture_output=True, text=True)
+        # 1. Primary Cloud Sync via GitHub REST API (No git CLI required)
+        if os.getenv('GITHUB_TOKEN'):
+            c_ok = self.sync_file_to_github(CONFIG_FILE, f"chore(uptrace): sync config.json [{timestamp}]")
+            s_ok = self.sync_file_to_github(STATUS_MD_FILE, f"chore(uptrace): automated health check & status report [{timestamp}]")
+            if c_ok or s_ok:
+                logger.info(f"🚀 GitHub API: Cloud sync completed for [{timestamp}]")
+                return {"status": "success", "message": f"Committed via GitHub API: {commit_msg}"}
 
-        user_name = os.getenv('GIT_COMMIT_AUTHOR_NAME', 'Uptrace Bot')
-        user_email = os.getenv('GIT_COMMIT_AUTHOR_EMAIL', 'uptrace-bot@users.noreply.github.com')
-        subprocess.run(["git", "config", "user.name", user_name], capture_output=True, text=True)
-        subprocess.run(["git", "config", "user.email", user_email], capture_output=True, text=True)
-
+        # 2. Local Git CLI fallback
         try:
+            gh_token = os.getenv('GITHUB_TOKEN')
+            if gh_token:
+                repo_url = f"https://x-access-token:{gh_token}@github.com/vardhineeditharak/Uptrace.git"
+                subprocess.run(["git", "remote", "set-url", "origin", repo_url], capture_output=True, text=True)
+
+            user_name = os.getenv('GIT_COMMIT_AUTHOR_NAME', 'Uptrace Bot')
+            user_email = os.getenv('GIT_COMMIT_AUTHOR_EMAIL', 'uptrace-bot@users.noreply.github.com')
+            subprocess.run(["git", "config", "user.name", user_name], capture_output=True, text=True)
+            subprocess.run(["git", "config", "user.email", user_email], capture_output=True, text=True)
+
             subprocess.run(["git", "add", CONFIG_FILE], capture_output=True, text=True)
             subprocess.run(["git", "add", "-f", STATUS_MD_FILE], capture_output=True, text=True)
             subprocess.run(["git", "add", "-f", HISTORY_FILE], capture_output=True, text=True)
@@ -923,7 +987,7 @@ Automated synthetic health check and keep-alive ping report. This file is contin
             else:
                 return {"status": "no_change", "message": "No new changes to commit"}
         except Exception as e:
-            logger.error(f"Git auto-commit failed: {e}")
+            logger.error(f"Git auto-commit note: {e}")
             return {"status": "error", "error": str(e)}
 
 # Initialize monitor engine
