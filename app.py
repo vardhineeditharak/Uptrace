@@ -895,17 +895,30 @@ Automated synthetic health check and keep-alive ping report. This file is contin
         timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         commit_msg = f"chore(uptrace): automated health check & keep-alive ping [{timestamp}]"
 
+        gh_token = os.getenv('GITHUB_TOKEN')
+        if gh_token:
+            repo_url = f"https://x-access-token:{gh_token}@github.com/vardhineeditharak/Uptrace.git"
+            subprocess.run(["git", "remote", "set-url", "origin", repo_url], capture_output=True, text=True)
+
+        user_name = os.getenv('GIT_COMMIT_AUTHOR_NAME', 'Uptrace Bot')
+        user_email = os.getenv('GIT_COMMIT_AUTHOR_EMAIL', 'uptrace-bot@users.noreply.github.com')
+        subprocess.run(["git", "config", "user.name", user_name], capture_output=True, text=True)
+        subprocess.run(["git", "config", "user.email", user_email], capture_output=True, text=True)
+
         try:
             subprocess.run(["git", "add", CONFIG_FILE], capture_output=True, text=True)
             subprocess.run(["git", "add", "-f", STATUS_MD_FILE], capture_output=True, text=True)
+            subprocess.run(["git", "add", "-f", HISTORY_FILE], capture_output=True, text=True)
+            subprocess.run(["git", "add", "-f", "logs/"], capture_output=True, text=True)
             res = subprocess.run(["git", "commit", "-m", commit_msg], capture_output=True, text=True)
             if res.returncode == 0:
                 logger.info(f"🌱 Git commit successful: '{commit_msg}'")
-                push_res = subprocess.run(["git", "push"], capture_output=True, text=True)
+                push_res = subprocess.run(["git", "push", "origin", "HEAD"], capture_output=True, text=True)
                 if push_res.returncode == 0:
                     logger.info("🚀 Git push successful!")
                     return {"status": "success", "message": f"Committed & pushed: {commit_msg}"}
                 else:
+                    logger.warning(f"Git push warning: {push_res.stderr}")
                     return {"status": "partial", "message": f"Committed locally: {commit_msg}"}
             else:
                 return {"status": "no_change", "message": "No new changes to commit"}
