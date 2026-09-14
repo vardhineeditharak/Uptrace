@@ -17,3 +17,9 @@
 2026-09-14 11:16:37,788 [INFO] ✅ [GET][PRODUCTION][300s] tiny-to (Web & Database) - HEALTHY (959.36ms) - 200
 2026-09-14 11:16:37,790 [INFO] 📊 Run Complete: 1/1 services operational (0 issues).
 2026-09-14 11:16:37,790 [INFO] ✨ Uptrace Run Finished.
+2026-09-14 16:49:17,552 [INFO] ============================================================
+2026-09-14 16:49:17,552 [INFO] ⚡ Starting Uptrace Headless Monitor Run
+2026-09-14 16:49:17,552 [INFO] ============================================================
+2026-09-14 16:49:18,500 [INFO] ✅ [GET][PRODUCTION][300s] tiny-to (Web & Database) - HEALTHY (812.65ms) - 200
+2026-09-14 16:49:18,502 [INFO] 📊 Run Complete: 1/1 services operational (0 issues).
+2026-09-14 16:49:18,502 [INFO] ✨ Uptrace Run Finished.
