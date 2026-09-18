@@ -316,3 +316,16 @@
 2026-09-18 21:45:03,533 [INFO] ✅ [GET][PRODUCTION][300s] PrepWise AI (Database Keep-Alive) - HEALTHY (1459.82ms) - 200
 2026-09-18 21:45:03,536 [INFO] 📊 Run Complete: 5/5 services operational (0 issues).
 2026-09-18 21:45:03,536 [INFO] ✨ Uptrace Run Finished.
+2026-09-18 21:45:20,406 [INFO] ============================================================
+2026-09-18 21:45:20,406 [INFO] ⚡ Starting Uptrace Headless Monitor Run
+2026-09-18 21:45:20,406 [INFO] ============================================================
+2026-09-18 21:45:20,784 [INFO] ✅ [GET][PRODUCTION][300s] Weather Forecaster (Web Application) - HEALTHY (234.04ms) - 200
+2026-09-18 21:45:20,789 [INFO] ✅ [GET][PRODUCTION][300s] FinGuide-Ai (Web App) - HEALTHY (237.87ms) - 200
+2026-09-18 21:45:20,870 [INFO] ✅ [GET][PRODUCTION][300s] Bolt Note (Web App) - HEALTHY (267.29ms) - 200
+2026-09-18 21:45:21,524 [INFO] ✅ [GET][PRODUCTION][300s] tiny-to (Web & Database) - HEALTHY (962.31ms) - 200
+2026-09-18 21:45:23,195 [INFO] ✅ [GET][PRODUCTION][300s] PrepWise AI (Database Keep-Alive) - HEALTHY (2580.69ms) - 200
+2026-09-18 21:45:23,198 [INFO] 📊 Run Complete: 5/5 services operational (0 issues).
+2026-09-18 21:45:23,198 [INFO] 📊 Dispatching Weekly SRE Performance & Reliability Report...
+2026-09-18 21:45:29,917 [ERROR] Failed to send weekly report email: (535, b'5.7.139 Authentication unsuccessful, SmtpClientAuthentication is disabled for the Mailbox. Visit https://aka.ms/smtp_auth_disabled for more information. [CY5PR15CA0216.namprd15.prod.outlook.com 2026-09-18T16:15:29.912Z 08DF154366A2AEDB]')
+2026-09-18 21:45:29,917 [WARNING] ℹ️ Weekly report status: (535, b'5.7.139 Authentication unsuccessful, SmtpClientAuthentication is disabled for the Mailbox. Visit https://aka.ms/smtp_auth_disabled for more information. [CY5PR15CA0216.namprd15.prod.outlook.com 2026-09-18T16:15:29.912Z 08DF154366A2AEDB]')
+2026-09-18 21:45:29,917 [INFO] ✨ Uptrace Run Finished.
