@@ -1,20 +1,16 @@
-name: ⚡ Uptrace Keep-Alive & Auto Commit logs
+name: 📊 Uptrace Weekly SRE Reliability Report & Email Digest
 
 on:
   schedule:
-    # Runs every 12 hours (00:00, 12:00 UTC)
-    - cron: '0 */12 * * *'
-  workflow_dispatch: # Allows manual trigger from GitHub Actions tab
-  push:
-    branches:
-      - main
-      - master
+    # Runs every Monday at 09:00 AM IST (03:30 AM UTC)
+    - cron: '30 3 * * 1'
+  workflow_dispatch: # Allows 1-click manual execution anytime from GitHub Actions tab
 
 permissions:
   contents: write
 
 jobs:
-  keepalive-and-commit:
+  weekly-report-digest:
     runs-on: ubuntu-latest
 
     steps:
@@ -34,7 +30,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: ⚡ Run Uptrace Keep-Alive Checks & Alerts
+      - name: 📊 Execute Health Checks & Mail Weekly SRE Report
         env:
           TZ: 'Asia/Kolkata'
           TIMEZONE: 'Asia/Kolkata'
@@ -46,14 +42,15 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           ALERT_SENDER_EMAIL: ${{ secrets.ALERT_SENDER_EMAIL }}
           ALERT_RECEIVER_EMAIL: ${{ secrets.ALERT_RECEIVER_EMAIL }}
+          WEEKLY_REPORT_RECIPIENT: ${{ secrets.WEEKLY_REPORT_RECIPIENT || secrets.ALERT_RECEIVER_EMAIL }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          python run_monitor.py --no-commit || echo "Checks completed"
+          python run_monitor.py --weekly-report --no-commit || echo "Weekly report run completed"
 
-      - name: 📊 Commit & Push Status Report, History & Logs to GitHub
+      - name: 📊 Commit & Push Updated Status, History & Logs to GitHub
         env:
           TZ: 'Asia/Kolkata'
           GIT_AUTHOR_NAME: ${{ github.actor }}
@@ -66,6 +63,6 @@ jobs:
             echo "No changes in status report."
           else
             TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S IST")
-            git commit -m "chore(uptrace): automated keep-alive status sync [$TIMESTAMP]"
+            git commit -m "chore(uptrace): weekly performance report & status sync [$TIMESTAMP]"
             git push origin HEAD
           fi

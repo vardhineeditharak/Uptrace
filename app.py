@@ -9,7 +9,7 @@ import threading
 import subprocess
 import base64
 from urllib.parse import urlparse
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from email.mime.multipart import MIMEMultipart
@@ -75,6 +75,8 @@ logger = logging.getLogger('Uptrace')
 
 CONFIG_FILE = 'config.json'
 HISTORY_FILE = os.path.join('data', 'uptime_history.json')
+INCIDENT_STATE_FILE = os.path.join('data', 'incident_state.json')
+INCIDENTS_LOG_FILE = os.path.join('data', 'incidents.json')
 STATUS_MD_FILE = 'STATUS.md'
 
 _ssl_cache = {}
@@ -132,7 +134,7 @@ class UptraceEngine:
     def __init__(self, config_path=CONFIG_FILE):
         self.config_path = config_path
         self.config = self.load_config()
-        self.incident_state = {}
+        self.incident_state = self.load_incident_state()
         self.latest_results_map = {}
         self.service_last_run = {}
         self.last_check_time = None
@@ -732,9 +734,74 @@ class UptraceEngine:
 
         return stats_by_service
 
+    def load_incident_state(self):
+        if os.path.exists(INCIDENT_STATE_FILE):
+            try:
+                with open(INCIDENT_STATE_FILE, 'r', encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception:
+                return {}
+        return {}
+
+    def save_incident_state(self):
+        try:
+            with open(INCIDENT_STATE_FILE, 'w', encoding='utf-8') as f:
+                json.dump(self.incident_state, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed saving incident state: {e}")
+
+    def log_incident_event(self, service_result, is_recovery=False):
+        svc_id = service_result['id']
+        incidents = []
+        if os.path.exists(INCIDENTS_LOG_FILE):
+            try:
+                with open(INCIDENTS_LOG_FILE, 'r', encoding='utf-8') as f:
+                    incidents = json.load(f)
+            except Exception:
+                incidents = []
+
+        now_str = get_now_str()
+        now_ts = time.time()
+
+        if not is_recovery:
+            open_inc = next((i for i in reversed(incidents) if i.get('service_id') == svc_id and not i.get('resolved_at')), None)
+            if not open_inc:
+                incidents.append({
+                    'id': f"inc-{int(now_ts)}",
+                    'service_id': svc_id,
+                    'service_name': service_result['name'],
+                    'environment': service_result.get('environment', 'production'),
+                    'category': service_result.get('category', 'Web Applications'),
+                    'target': service_result.get('target', ''),
+                    'method': service_result.get('method', 'GET'),
+                    'status': service_result['status'],
+                    'error': service_result.get('error') or f"HTTP {service_result.get('status_code', 'Error')}",
+                    'started_at': now_str,
+                    'started_ts': now_ts,
+                    'resolved_at': None,
+                    'duration_seconds': None
+                })
+        else:
+            for inc in reversed(incidents):
+                if inc.get('service_id') == svc_id and not inc.get('resolved_at'):
+                    inc['resolved_at'] = now_str
+                    started_ts = inc.get('started_ts', now_ts)
+                    inc['duration_seconds'] = max(1, int(now_ts - started_ts))
+                    break
+
+        if len(incidents) > 300:
+            incidents = incidents[-300:]
+
+        try:
+            with open(INCIDENTS_LOG_FILE, 'w', encoding='utf-8') as f:
+                json.dump(incidents, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed logging incident event: {e}")
+
     def process_incidents(self, results):
         now = time.time()
         cooldown_sec = self.config.get('settings', {}).get('incident_cooldown_minutes', 15) * 60
+        state_changed = False
 
         for r in results:
             if r['status'] == 'paused':
@@ -745,25 +812,33 @@ class UptraceEngine:
             prev_state = self.incident_state.get(svc_id, {'status': 'healthy', 'last_alert': 0})
 
             if curr_status in ['unhealthy', 'error']:
-                if prev_state['status'] == 'healthy' or (now - prev_state.get('last_alert', 0) > cooldown_sec):
-                    logger.warning(f"🚨 INCIDENT TRIGGERED for [{r.get('environment', 'prod').upper()}] {r['name']}: {r.get('error') or r.get('status_code')}")
+                if prev_state.get('status') == 'healthy' or (now - prev_state.get('last_alert', 0) > cooldown_sec):
+                    logger.warning(f"🚨 IMMEDIATE INCIDENT ALERT: [{r.get('environment', 'prod').upper()}] {r['name']}: {r.get('error') or r.get('status_code')}")
                     self.dispatch_all_alerts(r, is_recovery=False)
+                    self.log_incident_event(r, is_recovery=False)
                     self.incident_state[svc_id] = {
                         'status': curr_status,
                         'last_alert': now,
-                        'incident_started': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                        'incident_started': get_now_str()
                     }
+                    state_changed = True
                 else:
                     self.incident_state[svc_id]['status'] = curr_status
+                    state_changed = True
 
             elif curr_status == 'healthy' and prev_state.get('status') in ['unhealthy', 'error']:
-                logger.info(f"🎉 RECOVERY TRIGGERED for [{r.get('environment', 'prod').upper()}] {r['name']}")
+                logger.info(f"🎉 IMMEDIATE RECOVERY ALERT: [{r.get('environment', 'prod').upper()}] {r['name']}")
                 self.dispatch_all_alerts(r, is_recovery=True)
+                self.log_incident_event(r, is_recovery=True)
                 self.incident_state[svc_id] = {
                     'status': 'healthy',
                     'last_alert': now,
-                    'recovered_at': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                    'recovered_at': get_now_str()
                 }
+                state_changed = True
+
+        if state_changed:
+            self.save_incident_state()
 
     def dispatch_all_alerts(self, service_result, is_recovery=False):
         self.send_email_alert(service_result, is_recovery)
@@ -780,50 +855,83 @@ class UptraceEngine:
         sender = os.getenv('ALERT_SENDER_EMAIL') or smtp_user
         receiver = os.getenv('ALERT_RECEIVER_EMAIL') or smtp_user
 
+        if not smtp_enabled or not smtp_host or not smtp_user:
+            logger.debug("SMTP alert skipped: SMTP_ENABLED is false or credentials missing in .env")
+            return False
+
         env_tag = service_result.get('environment', 'production').upper()
-        subject = f"{'✅ [RESOLVED]' if is_recovery else '🚨 [INCIDENT]'} [{env_tag}] Uptrace Alert: {service_result['name']} is {'back ONLINE' if is_recovery else 'DOWN'}"
+        status_name = "RECOVERED / ONLINE" if is_recovery else "DOWN / INCIDENT"
+        subject = f"{'✅ [RESOLVED]' if is_recovery else '🚨 [INCIDENT ALERT]'} [{env_tag}] {service_result['name']} is {status_name}"
         status_color = "#10b981" if is_recovery else "#ef4444"
-        headline = "Service Recovered" if is_recovery else "Incident Detected"
-        
+        bg_accent = "rgba(16, 185, 129, 0.12)" if is_recovery else "rgba(239, 68, 68, 0.12)"
+        headline = "Service Recovered & Fully Operational" if is_recovery else "Critical Service Incident Detected"
+        timestamp = get_now_str()
+
+        plain_text = f"""⚡ UPTRACE SRE ALERT
+Status: {'RESOLVED' if is_recovery else 'CRITICAL INCIDENT'}
+Service: {service_result['name']}
+Environment: {env_tag}
+Target: {service_result.get('method', 'GET')} {service_result.get('target', '')}
+Latency: {service_result.get('latency_ms', 0)} ms
+Error: {service_result.get('error') or 'Operational'}
+Time: {timestamp}
+"""
+
         html_content = f"""
+        <!DOCTYPE html>
         <html>
-        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #0f101a; color: #ffffff; padding: 20px;">
-            <div style="max-width: 600px; margin: 0 auto; background: #151621; border-radius: 16px; padding: 24px; border: 1px solid #1f2433;">
-                <h2 style="margin: 0 0 16px 0; color: #ffffff;">⚡ Uptrace • [{env_tag}] Alert</h2>
-                <div style="background-color: {status_color}18; border-left: 3px solid {status_color}; padding: 12px 16px; border-radius: 6px; margin-bottom: 20px;">
-                    <h3 style="margin: 0 0 4px 0; color: {status_color};">{headline}</h3>
-                    <p style="margin: 0; font-size: 14px;"><strong>{service_result['name']}</strong> is {service_result['status'].upper()}.</p>
+        <head><meta charset="utf-8"></head>
+        <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #0b0c14; color: #ffffff; padding: 24px 12px; margin: 0;">
+            <div style="max-width: 580px; margin: 0 auto; background: #121422; border-radius: 16px; border: 1px solid #1e2238; overflow: hidden; box-shadow: 0 12px 36px rgba(0,0,0,0.5);">
+                <div style="background: linear-gradient(135deg, #17192a 0%, #1f2238 100%); padding: 20px 24px; border-bottom: 1px solid #232742;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span style="font-size: 18px; font-weight: 700; color: #ffffff;">⚡ Uptrace SRE</span>
+                        <span style="background: rgba(91, 99, 211, 0.2); border: 1px solid #5b63d3; color: #a5b4fc; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 9999px;">{env_tag}</span>
+                    </div>
                 </div>
-                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
-                    <tr><td style="padding: 6px 0; color: #646e87;">Environment:</td><td style="padding: 6px 0; color: #ffffff;">{env_tag}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #646e87;">Target:</td><td style="padding: 6px 0; color: #c9d3ee;">{service_result.get('method', 'GET')} {service_result['target']}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #646e87;">Latency:</td><td style="padding: 6px 0; color: #c9d3ee;">{service_result.get('latency_ms', 0)} ms</td></tr>
-                    <tr><td style="padding: 6px 0; color: #646e87;">Details:</td><td style="padding: 6px 0; color: #f43f5e;">{service_result.get('error') or 'Operational'}</td></tr>
-                </table>
+                <div style="padding: 24px;">
+                    <div style="background: {bg_accent}; border-left: 4px solid {status_color}; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                        <h2 style="margin: 0 0 6px 0; color: {status_color}; font-size: 18px;">{headline}</h2>
+                        <p style="margin: 0; font-size: 14px; color: #c9d3ee;"><strong>{service_result['name']}</strong> is currently <strong>{service_result['status'].upper()}</strong>.</p>
+                    </div>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 20px;">
+                        <tr style="border-bottom: 1px solid #1e2238;"><td style="padding: 10px 0; color: #646e87; width: 35%;">Service:</td><td style="padding: 10px 0; color: #ffffff; font-weight: 600;">{service_result['name']}</td></tr>
+                        <tr style="border-bottom: 1px solid #1e2238;"><td style="padding: 10px 0; color: #646e87;">Environment:</td><td style="padding: 10px 0; color: #c9d3ee;"><code style="background: #17192a; padding: 2px 6px; border-radius: 4px;">{env_tag}</code></td></tr>
+                        <tr style="border-bottom: 1px solid #1e2238;"><td style="padding: 10px 0; color: #646e87;">Endpoint Target:</td><td style="padding: 10px 0; color: #c9d3ee; font-family: monospace; word-break: break-all;">{service_result.get('method', 'GET')} {service_result.get('target', '')}</td></tr>
+                        <tr style="border-bottom: 1px solid #1e2238;"><td style="padding: 10px 0; color: #646e87;">Response Latency:</td><td style="padding: 10px 0; color: #c9d3ee;">{service_result.get('latency_ms', 0)} ms</td></tr>
+                        <tr style="border-bottom: 1px solid #1e2238;"><td style="padding: 10px 0; color: #646e87;">HTTP Status / Error:</td><td style="padding: 10px 0; color: {status_color}; font-weight: 600;">{service_result.get('error') or f"HTTP {service_result.get('status_code', '200')}"}</td></tr>
+                        <tr><td style="padding: 10px 0; color: #646e87;">Timestamp:</td><td style="padding: 10px 0; color: #c9d3ee;">{timestamp}</td></tr>
+                    </table>
+                    <div style="text-align: center; margin-top: 24px; padding-top: 16px; border-top: 1px solid #1e2238;">
+                        <a href="https://github.com/{os.getenv('GITHUB_REPOSITORY', 'vardhineeditharak/Uptrace')}" style="background: #5b63d3; color: #ffffff; text-decoration: none; padding: 10px 22px; border-radius: 8px; font-size: 13px; font-weight: 600; display: inline-block;">Open Uptrace Status Report</a>
+                    </div>
+                </div>
             </div>
         </body>
         </html>
         """
-
-        if not smtp_enabled or not smtp_host or not smtp_user:
-            return False
 
         try:
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
             msg['From'] = sender
             msg['To'] = receiver
+            msg.attach(MIMEText(plain_text, 'plain'))
             msg.attach(MIMEText(html_content, 'html'))
 
-            server = smtplib.SMTP(smtp_host, smtp_port, timeout=10)
-            server.starttls()
+            if smtp_port == 465:
+                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=12)
+            else:
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=12)
+                server.starttls()
+
             server.login(smtp_user, smtp_pass)
             server.sendmail(sender, [receiver], msg.as_string())
             server.quit()
-            logger.info(f"📧 Email alert sent to {receiver} for [{env_tag}] {service_result['name']}")
+            logger.info(f"📧 Immediate Email alert dispatched to {receiver} for [{env_tag}] {service_result['name']}")
             return True
         except Exception as e:
-            logger.error(f"Failed to send email alert: {e}")
+            logger.error(f"Failed to send email alert to {receiver}: {e}")
             return False
 
     def send_discord_alert(self, service_result, is_recovery=False):
@@ -903,6 +1011,310 @@ class UptraceEngine:
             logger.error(f"Slack alert error: {e}")
             return False
 
+    def generate_weekly_report_data(self):
+        """Generates comprehensive 7-day performance metrics, uptime SLAs, and incident history"""
+        history = []
+        if os.path.exists(HISTORY_FILE):
+            try:
+                with open(HISTORY_FILE, 'r', encoding='utf-8') as f:
+                    history = json.load(f)
+            except Exception:
+                history = []
+
+        incidents = []
+        if os.path.exists(INCIDENTS_LOG_FILE):
+            try:
+                with open(INCIDENTS_LOG_FILE, 'r', encoding='utf-8') as f:
+                    incidents = json.load(f)
+            except Exception:
+                incidents = []
+
+        now = get_now()
+        start_date = now - timedelta(days=7)
+        date_range_str = f"{start_date.strftime('%d %b %Y')} – {now.strftime('%d %b %Y')}"
+
+        recent_history = []
+        tz = get_tz()
+        cutoff_dt = now - timedelta(days=7)
+        for h in history:
+            ts_str = h.get('timestamp')
+            if ts_str:
+                try:
+                    dt = datetime.strptime(ts_str, '%Y-%m-%d %H:%M:%S').replace(tzinfo=tz)
+                    if dt >= cutoff_dt:
+                        recent_history.append(h)
+                except Exception:
+                    recent_history.append(h)
+            else:
+                recent_history.append(h)
+
+        if not recent_history and history:
+            recent_history = history[-100:]
+
+        services = self.config.get('services', [])
+        latest_results = self.get_all_results_list()
+        latest_map = {r['id']: r for r in latest_results}
+
+        total_checks_all = 0
+        healthy_checks_all = 0
+        all_latencies = []
+        services_report = []
+
+        for svc in services:
+            svc_id = svc.get('id', svc.get('name'))
+            svc_res = latest_map.get(svc_id, {})
+            svc_checks = []
+            svc_latencies = []
+
+            for h in recent_history:
+                s_data = h.get('services', {}).get(svc_id)
+                if s_data:
+                    st = s_data.get('status', 'healthy')
+                    svc_checks.append(st)
+                    if s_data.get('latency', 0) > 0:
+                        svc_latencies.append(s_data['latency'])
+                        all_latencies.append(s_data['latency'])
+
+            total_c = len(svc_checks)
+            healthy_c = sum(1 for s in svc_checks if s == 'healthy')
+            uptime_pct = round((healthy_c / total_c) * 100, 2) if total_c > 0 else 100.0
+            avg_lat = round(sum(svc_latencies) / len(svc_latencies), 1) if svc_latencies else round(svc_res.get('latency_ms', 0), 1)
+
+            total_checks_all += total_c
+            healthy_checks_all += healthy_c
+
+            svc_incidents = [inc for inc in incidents if inc.get('service_id') == svc_id]
+            ssl_info = svc_res.get('ssl_info')
+            ssl_text = f"{ssl_info['days_left']}d left" if ssl_info else "N/A"
+
+            services_report.append({
+                'id': svc_id,
+                'name': svc.get('name'),
+                'environment': svc.get('environment', 'production').upper(),
+                'category': svc.get('category', 'Web Applications'),
+                'target': svc.get('url') if svc.get('type') != 'tcp_db' else f"{svc.get('host')}:{svc.get('port')}",
+                'method': svc.get('method', 'GET') if svc.get('type') != 'tcp_db' else 'TCP',
+                'current_status': svc_res.get('status', 'healthy'),
+                'uptime_7d': uptime_pct,
+                'avg_latency': avg_lat,
+                'total_checks': total_c,
+                'ssl_days_left': ssl_text,
+                'incident_count': len(svc_incidents)
+            })
+
+        overall_sla = round((healthy_checks_all / total_checks_all) * 100, 2) if total_checks_all > 0 else 100.0
+        avg_latency_all = round(sum(all_latencies) / len(all_latencies), 1) if all_latencies else 0
+
+        recent_incidents = []
+        for inc in incidents:
+            started_at = inc.get('started_at')
+            if started_at:
+                try:
+                    dt = datetime.strptime(started_at, '%Y-%m-%d %H:%M:%S').replace(tzinfo=tz)
+                    if dt >= cutoff_dt:
+                        recent_incidents.append(inc)
+                except Exception:
+                    recent_incidents.append(inc)
+            else:
+                recent_incidents.append(inc)
+
+        return {
+            'date_range': date_range_str,
+            'generated_at': get_now_str(),
+            'overall_sla': overall_sla,
+            'total_services': len(services),
+            'total_checks': total_checks_all,
+            'total_incidents': len(recent_incidents),
+            'avg_latency': avg_latency_all,
+            'services': services_report,
+            'incidents': recent_incidents
+        }
+
+    def send_weekly_report_email(self, recipient=None):
+        smtp_enabled = os.getenv('SMTP_ENABLED', 'false').lower() in ('true', '1', 'yes')
+        smtp_host = os.getenv('SMTP_HOST')
+        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        smtp_user = os.getenv('SMTP_USER')
+        smtp_pass = os.getenv('SMTP_PASSWORD')
+        sender = os.getenv('ALERT_SENDER_EMAIL') or smtp_user
+        receiver = recipient or os.getenv('WEEKLY_REPORT_RECIPIENT') or os.getenv('ALERT_RECEIVER_EMAIL') or smtp_user
+
+        data = self.generate_weekly_report_data()
+        subject = f"📊 [WEEKLY REPORT] Uptrace SRE Performance & Reliability ({data['date_range']}) — {data['overall_sla']}% SLA"
+
+        rows_html = ""
+        for s in data['services']:
+            status_badge = '<span style="color: #10b981; font-weight: 600;">🟢 Healthy</span>' if s['current_status'] == 'healthy' else (
+                '<span style="color: #f59e0b; font-weight: 600;">🟡 Warning</span>' if s['current_status'] == 'unhealthy' else '<span style="color: #ef4444; font-weight: 600;">🔴 Error</span>'
+            )
+            sla_color = "#10b981" if s['uptime_7d'] >= 99.0 else ("#f59e0b" if s['uptime_7d'] >= 95.0 else "#ef4444")
+            
+            rows_html += f"""
+            <tr style="border-bottom: 1px solid #1f2433;">
+                <td style="padding: 12px 10px; font-weight: 600; color: #ffffff;">{s['name']}<br><span style="font-size: 11px; font-weight: normal; color: #8892b0;">{s['method']} • {s['category']}</span></td>
+                <td style="padding: 12px 10px; text-align: center;"><span style="background: #1e2238; color: #c9d3ee; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-family: monospace;">{s['environment']}</span></td>
+                <td style="padding: 12px 10px; text-align: center; font-weight: 700; color: {sla_color}; font-family: monospace;">{s['uptime_7d']}%</td>
+                <td style="padding: 12px 10px; text-align: center; color: #c9d3ee; font-family: monospace;">{s['avg_latency']}ms</td>
+                <td style="padding: 12px 10px; text-align: center; color: #8892b0; font-size: 12px;">{s['ssl_days_left']}</td>
+                <td style="padding: 12px 10px; text-align: center;">{status_badge}</td>
+            </tr>
+            """
+
+        incidents_html = ""
+        if data['incidents']:
+            inc_rows = ""
+            for inc in data['incidents']:
+                dur_text = f"{inc['duration_seconds']}s" if inc.get('duration_seconds') else "Active"
+                resolved_text = f"Resolved at {inc['resolved_at']}" if inc.get('resolved_at') else "Ongoing"
+                inc_rows += f"""
+                <tr style="border-bottom: 1px solid #2d1822;">
+                    <td style="padding: 8px 10px; color: #f43f5e; font-weight: 600;">{inc.get('service_name')}</td>
+                    <td style="padding: 8px 10px; color: #c9d3ee; font-size: 12px;">{inc.get('error')}</td>
+                    <td style="padding: 8px 10px; color: #8892b0; font-size: 12px;">{inc.get('started_at')}</td>
+                    <td style="padding: 8px 10px; color: #10b981; font-size: 12px;">{resolved_text} ({dur_text})</td>
+                </tr>
+                """
+            incidents_html = f"""
+            <div style="margin-top: 24px;">
+                <h3 style="margin: 0 0 12px 0; color: #f43f5e; font-size: 15px;">⚠️ Logged Incidents & Downtime Events ({len(data['incidents'])})</h3>
+                <table style="width: 100%; border-collapse: collapse; background: #1a1017; border: 1px solid #3b1822; border-radius: 8px; font-size: 13px;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid #3b1822; background: #24121d; color: #f43f5e;">
+                            <th style="padding: 8px 10px; text-align: left;">Service</th>
+                            <th style="padding: 8px 10px; text-align: left;">Root Cause / Status</th>
+                            <th style="padding: 8px 10px; text-align: left;">Started</th>
+                            <th style="padding: 8px 10px; text-align: left;">Resolution (Duration)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {inc_rows}
+                    </tbody>
+                </table>
+            </div>
+            """
+        else:
+            incidents_html = """
+            <div style="margin-top: 24px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 14px 18px;">
+                <div style="color: #10b981; font-weight: 600; font-size: 14px;">
+                    <span>🛡️ 100% Reliability — Zero Incidents Logged This Week</span>
+                </div>
+                <p style="margin: 4px 0 0 0; font-size: 12px; color: #8892b0;">All synthetic keep-alive pings and database connections remained operational without downtime.</p>
+            </div>
+            """
+
+        overall_sla_color = "#10b981" if data['overall_sla'] >= 99.0 else ("#f59e0b" if data['overall_sla'] >= 95.0 else "#ef4444")
+
+        html_content = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        </head>
+        <body style="margin: 0; padding: 24px 12px; background-color: #090a10; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #ffffff;">
+            <div style="max-width: 680px; margin: 0 auto; background: #11131f; border-radius: 16px; border: 1px solid #1e2238; overflow: hidden; box-shadow: 0 12px 36px rgba(0,0,0,0.5);">
+                <!-- Header -->
+                <div style="background: linear-gradient(135deg, #17192a 0%, #1a1c33 100%); padding: 24px 28px; border-bottom: 1px solid #232742;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-size: 20px; font-weight: 700; letter-spacing: -0.5px; color: #ffffff;">⚡ Uptrace</span>
+                        <span style="background: rgba(91, 99, 211, 0.2); border: 1px solid #5b63d3; color: #a5b4fc; font-size: 11px; font-weight: 600; padding: 4px 10px; border-radius: 9999px;">WEEKLY SRE REPORT</span>
+                    </div>
+                    <h1 style="margin: 0 0 6px 0; font-size: 18px; color: #ffffff;">Cloud Reliability & SLA Performance Summary</h1>
+                    <div style="font-size: 13px; color: #8892b0;">Period: <strong style="color: #c9d3ee;">{data['date_range']}</strong> • Generated: <strong style="color: #c9d3ee;">{data['generated_at']}</strong></div>
+                </div>
+
+                <div style="padding: 24px 28px;">
+                    <!-- 4-KPI Metric Cards Grid -->
+                    <table style="width: 100%; border-collapse: separate; border-spacing: 10px; margin: -10px -10px 14px -10px;">
+                        <tr>
+                            <td style="background: #17192a; border: 1px solid #232742; border-radius: 12px; padding: 14px; text-align: center; width: 25%;">
+                                <div style="font-size: 11px; color: #8892b0; text-transform: uppercase; margin-bottom: 4px;">7-Day SLA</div>
+                                <div style="font-size: 22px; font-weight: 800; color: {overall_sla_color};">{data['overall_sla']}%</div>
+                                <div style="font-size: 10px; color: #646e87; margin-top: 2px;">Overall Availability</div>
+                            </td>
+                            <td style="background: #17192a; border: 1px solid #232742; border-radius: 12px; padding: 14px; text-align: center; width: 25%;">
+                                <div style="font-size: 11px; color: #8892b0; text-transform: uppercase; margin-bottom: 4px;">Monitors</div>
+                                <div style="font-size: 22px; font-weight: 800; color: #60a5fa;">{data['total_services']}</div>
+                                <div style="font-size: 10px; color: #646e87; margin-top: 2px;">Active Endpoints</div>
+                            </td>
+                            <td style="background: #17192a; border: 1px solid #232742; border-radius: 12px; padding: 14px; text-align: center; width: 25%;">
+                                <div style="font-size: 11px; color: #8892b0; text-transform: uppercase; margin-bottom: 4px;">Incidents</div>
+                                <div style="font-size: 22px; font-weight: 800; color: {'#10b981' if data['total_incidents'] == 0 else '#f43f5e'};">{data['total_incidents']}</div>
+                                <div style="font-size: 10px; color: #646e87; margin-top: 2px;">7d Downtime Events</div>
+                            </td>
+                            <td style="background: #17192a; border: 1px solid #232742; border-radius: 12px; padding: 14px; text-align: center; width: 25%;">
+                                <div style="font-size: 11px; color: #8892b0; text-transform: uppercase; margin-bottom: 4px;">Avg Latency</div>
+                                <div style="font-size: 22px; font-weight: 800; color: #c084fc;">{data['avg_latency']}ms</div>
+                                <div style="font-size: 10px; color: #646e87; margin-top: 2px;">Global Response</div>
+                            </td>
+                        </tr>
+                    </table>
+
+                    <!-- Service Health Table -->
+                    <div style="margin-top: 16px;">
+                        <h3 style="margin: 0 0 10px 0; font-size: 15px; color: #ffffff;">📊 Service Availability & Latency Matrix</h3>
+                        <table style="width: 100%; border-collapse: collapse; background: #151726; border: 1px solid #20243b; border-radius: 10px; overflow: hidden; font-size: 13px;">
+                            <thead>
+                                <tr style="background: #1a1d30; color: #8892b0; font-size: 11px; text-transform: uppercase; border-bottom: 1px solid #20243b;">
+                                    <th style="padding: 10px; text-align: left;">Service / Target</th>
+                                    <th style="padding: 10px; text-align: center;">Env</th>
+                                    <th style="padding: 10px; text-align: center;">7d SLA</th>
+                                    <th style="padding: 10px; text-align: center;">Avg Latency</th>
+                                    <th style="padding: 10px; text-align: center;">SSL Cert</th>
+                                    <th style="padding: 10px; text-align: center;">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows_html}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Incidents Block -->
+                    {incidents_html}
+
+                    <!-- Footer / Actions -->
+                    <div style="margin-top: 28px; padding-top: 20px; border-top: 1px solid #1e2238; text-align: center; color: #646e87; font-size: 12px;">
+                        <p style="margin: 0 0 12px 0;">Generated automatically by <strong>Uptrace Midnight SRE Monitor</strong>.</p>
+                        <div style="display: inline-block;">
+                            <a href="https://github.com/{os.getenv('GITHUB_REPOSITORY', 'vardhineeditharak/Uptrace')}" style="background: #5b63d3; color: #ffffff; text-decoration: none; padding: 8px 18px; border-radius: 8px; font-size: 12px; font-weight: 600; margin: 0 4px; display: inline-block;">View Repository & STATUS.md</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        plain_text = f"Uptrace Weekly SRE Report ({data['date_range']})\nOverall 7-Day SLA: {data['overall_sla']}%\nActive Services: {data['total_services']}\nTotal Incidents: {data['total_incidents']}\nAvg Latency: {data['avg_latency']}ms\n"
+
+        if not smtp_enabled or not smtp_host or not smtp_user:
+            logger.warning("⚠️ SMTP is disabled or incomplete in .env. Weekly report not dispatched via email.")
+            return {"status": "skipped", "message": "SMTP is disabled or not configured in .env", "data": data}
+
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = subject
+            msg['From'] = sender
+            msg['To'] = receiver
+            msg.attach(MIMEText(plain_text, 'plain'))
+            msg.attach(MIMEText(html_content, 'html'))
+
+            if smtp_port == 465:
+                server = smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=12)
+            else:
+                server = smtplib.SMTP(smtp_host, smtp_port, timeout=12)
+                server.starttls()
+
+            server.login(smtp_user, smtp_pass)
+            server.sendmail(sender, [receiver], msg.as_string())
+            server.quit()
+            logger.info(f"📧 Weekly SRE report successfully mailed to {receiver}")
+            return {"status": "success", "recipient": receiver, "subject": subject, "data": data}
+        except Exception as e:
+            logger.error(f"Failed to send weekly report email: {e}")
+            return {"status": "error", "error": str(e), "data": data}
+
     def save_history(self, results):
         entry = {
             'timestamp': get_now_str('%Y-%m-%d %H:%M:%S'),
@@ -921,8 +1333,8 @@ class UptraceEngine:
                 history = []
         
         history.append(entry)
-        if len(history) > 150:
-            history = history[-150:]
+        if len(history) > 1000:
+            history = history[-1000:]
 
         try:
             with open(HISTORY_FILE, 'w', encoding='utf-8') as f:
@@ -1336,6 +1748,57 @@ def api_history():
 @login_required_if_enabled
 def api_incidents():
     return jsonify({'incidents': monitor.incident_state})
+
+@app.route('/api/incidents/history')
+@login_required_if_enabled
+def api_incidents_history():
+    if os.path.exists(INCIDENTS_LOG_FILE):
+        try:
+            with open(INCIDENTS_LOG_FILE, 'r', encoding='utf-8') as f:
+                incidents = json.load(f)
+            return jsonify({'incidents': incidents})
+        except Exception as e:
+            return jsonify({'error': str(e), 'incidents': []})
+    return jsonify({'incidents': []})
+
+@app.route('/api/weekly-report')
+@login_required_if_enabled
+def api_weekly_report():
+    data = monitor.generate_weekly_report_data()
+    return jsonify(data)
+
+@app.route('/api/alerts/send-weekly-report', methods=['POST'])
+@login_required_if_enabled
+def api_send_weekly_report():
+    body = request.get_json() or {}
+    recipient = body.get('recipient')
+    res = monitor.send_weekly_report_email(recipient=recipient)
+    return jsonify(res)
+
+@app.route('/api/alerts/test-incident', methods=['POST'])
+@login_required_if_enabled
+def api_test_incident_alert():
+    # Send a simulated test alert
+    sample_result = {
+        'id': 'test-mon-sample',
+        'name': 'Sample Web Application (Test Alert)',
+        'environment': 'production',
+        'type': 'http',
+        'method': 'GET',
+        'target': 'https://example.com/health',
+        'category': 'Web Applications',
+        'status': 'unhealthy',
+        'status_code': 503,
+        'latency_ms': 1240.5,
+        'error': '503 Service Unavailable (Test Incident Alert verification)',
+        'last_checked': get_now_str()
+    }
+    sent = monitor.send_email_alert(sample_result, is_recovery=False)
+    receiver = os.getenv('ALERT_RECEIVER_EMAIL') or os.getenv('SMTP_USER') or 'configured email'
+    if sent:
+        return jsonify({'status': 'success', 'message': f'Test incident alert email dispatched to {receiver}'})
+    else:
+        return jsonify({'status': 'error', 'message': 'Failed sending test alert. Check SMTP_ENABLED and SMTP credentials in .env'}), 400
 
 if __name__ == '__main__':
     checker_thread = threading.Thread(target=background_checker_job, daemon=True)

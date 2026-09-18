@@ -43,13 +43,15 @@ Modern cloud hosting platforms (**Render**, **Railway**, **Fly.io**, **Vercel**,
 - **Data Privacy & Zero Secret Leakage**:
   - Strict `.gitignore` policy protecting `.env`, logs, and history data.
   - Works seamlessly inside private repositories.
-- **Multi-Channel Alert Dispatcher**:
-  - Email (SMTP) supporting Gmail App Passwords, Outlook, SendGrid, Mailgun, and custom SMTP.
+- **Multi-Channel Alert Dispatcher & Weekly Reports**:
+  - Immediate email incident alerts (`🚨 [INCIDENT]` & `✅ [RESOLVED]`) supporting Gmail App Passwords, Outlook, AWS SES, and custom SMTP.
+  - Automated **Weekly SRE Performance & SLA Reports** summarizing 7-day availability, average latency, and incident logs.
   - Discord Webhooks, Telegram Bots, and Slack Incoming Webhooks.
   - Alert throttling & incident cooldown to prevent inbox spam.
-- **Automated Keep-Alive Engine**:
-  - Built-in GitHub Actions workflow (`.github/workflows/uptrace-keepalive.yml`) runs on a scheduled cron.
-  - Headless CLI script (`run_monitor.py`) for custom cron jobs and CI/CD pipelines.
+- **Automated Keep-Alive & Weekly Digest Engine**:
+  - Keep-Alive workflow ([`.github/workflows/uptrace-keepalive.yml`](.github/workflows/uptrace-keepalive.yml)) runs every 12 hours.
+  - Weekly Report workflow ([`.github/workflows/uptrace-weekly-report.yml`](.github/workflows/uptrace-weekly-report.yml)) emails 7-day reliability digests every Monday.
+  - Headless CLI script (`run_monitor.py`) for custom cron jobs, weekly reports (`--weekly-report`), and test alerts (`--test-alert`).
 
 ---
 
@@ -127,38 +129,72 @@ python run_monitor.py --no-commit
 
 ---
 
-## 🔒 Deploying with 100% Data Privacy
+## 🌐 Render Deployment (Web Dashboard & API)
 
-To run Uptrace with **zero public exposure** of your database connection strings, endpoints, and logs:
+To host the interactive **Midnight SRE Web Console** on Render with zero secret exposure:
 
-### 1. Keep Your GitHub Repository Private
+1. Create a new **Web Service** on [Render Dashboard](https://dashboard.render.com).
+2. Connect your GitHub repository (`vardhineeditharak/Uptrace`).
+3. Set **Runtime**: `Python 3`, **Build Command**: `pip install -r requirements.txt`, **Start Command**: `python app.py`.
+4. In the **Environment** tab on Render, add these variables:
 
-1. Make your repository **Private** on GitHub.
-2. GitHub Actions will execute automated checks and commit status updates inside your private repo without exposing your endpoints or code.
-
-### 2. Lock Down Your Deployed Web Dashboard
-
-When deploying on Render, Railway, Fly.io, or VPS, set these environment variables:
-
-```env
-REQUIRE_AUTH=true
-ALLOWED_GITHUB_USERS=your_github_username
-ENABLE_DEMO_LOGIN=false
-```
-
-- Any visitor to your deployed website URL is redirected to GitHub OAuth.
-- Only your whitelisted GitHub account can view or manage the console.
+| Variable | Value | Purpose |
+| :--- | :--- | :--- |
+| `SECRET_KEY` | `uptrace-super-secret-key-prod` | Encrypts user session cookies |
+| `REQUIRE_AUTH` | `true` | Locks dashboard from public access |
+| `ADMIN_PASSWORD` | `your-master-admin-password` | 1-click password login without OAuth |
+| `ENABLE_DEMO_LOGIN` | `false` | Disables demo bypass in production |
+| `GITHUB_CLIENT_ID` | `Iv1.xxxxxxxxxxxx` *(Optional)* | GitHub OAuth App Client ID |
+| `GITHUB_CLIENT_SECRET` | `xxxxxxxxxxxxxxxx` *(Optional)* | GitHub OAuth App Secret |
+| `ALLOWED_GITHUB_USERS` | `your_github_username` | Whitelisted GitHub accounts |
+| `SMTP_ENABLED` | `true` | Enables incident email alerts |
+| `SMTP_HOST` | `smtp.gmail.com` | SMTP host |
+| `SMTP_PORT` | `587` | SMTP port (587 for TLS, 465 for SSL) |
+| `SMTP_USER` | `your-email@gmail.com` | Sender account |
+| `SMTP_PASSWORD` | `your-16-char-app-password` | Gmail App Password |
+| `ALERT_SENDER_EMAIL` | `your-email@gmail.com` | From email address |
+| `ALERT_RECEIVER_EMAIL` | `your-alerts-inbox@gmail.com` | To email address (incident recipient) |
+| `WEEKLY_REPORT_ENABLED` | `true` | Enables weekly SRE digest emails |
+| `WEEKLY_REPORT_RECIPIENT`| `your-alerts-inbox@gmail.com` | Recipient for weekly reports |
+| `ENABLE_GIT_AUTO_COMMIT` | `true` | Pushes live config edits to GitHub |
+| `GITHUB_TOKEN` | `ghp_xxxxxxxxxxxxxxxxxxxx` | GitHub PAT for REST API repo sync |
+| `GITHUB_REPOSITORY` | `vardhineeditharak/Uptrace` | GitHub repository name |
+| `TIMEZONE` | `Asia/Kolkata` | Local time zone |
+| `TIMEZONE_CODE` | `IST` | Time zone abbreviation |
 
 ---
 
-## 🤖 24/7 GitHub Actions Automation
+## 🤖 GitHub Actions Secrets (Automated 12h Keep-Alive & Weekly Reports)
 
-To keep your cloud apps awake without running your local PC:
+To keep your cloud apps awake and receive weekly reports automatically without running your local PC or keeping Render awake:
 
-1. Push this repository to your private GitHub account.
-2. Go to **Settings > Secrets and variables > Actions** in your repository.
-3. Add any desired secrets (e.g. `SMTP_ENABLED`, `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `ALERT_RECEIVER_EMAIL`).
-4. The workflow in [`.github/workflows/uptrace-keepalive.yml`](.github/workflows/uptrace-keepalive.yml) will execute automatically on schedule, ping all services, update [`STATUS.md`](STATUS.md), and commit to your private repository!
+1. In your GitHub repository, navigate to: **Settings > Secrets and variables > Actions**.
+2. Click **New repository secret** and add these secrets:
+
+### Required Secrets for GitHub Actions:
+| GitHub Secret Name | Recommended Value | Description |
+| :--- | :--- | :--- |
+| `SMTP_ENABLED` | `true` | Enables email sending inside GitHub Actions |
+| `SMTP_HOST` | `smtp.gmail.com` | SMTP Server (Gmail, SendGrid, Outlook, SES) |
+| `SMTP_PORT` | `587` | SMTP Port (`587` for STARTTLS, `465` for SSL) |
+| `SMTP_USER` | `your-email@gmail.com` | Your SMTP username / email address |
+| `SMTP_PASSWORD` | `your-16-char-app-password` | 16-character Google App Password |
+| `ALERT_SENDER_EMAIL` | `your-email@gmail.com` | Sender email address |
+| `ALERT_RECEIVER_EMAIL` | `your-alerts-inbox@gmail.com`| Where incident alerts & weekly reports go |
+
+### Optional Secrets:
+| GitHub Secret Name | Recommended Value | Description |
+| :--- | :--- | :--- |
+| `WEEKLY_REPORT_RECIPIENT` | `your-alerts-inbox@gmail.com` | Dedicated weekly report recipient inbox |
+| `GIT_AUTHOR_EMAIL` | `vardhineedi.tharak@gmail.com` | Email for automated git status commits |
+| `DISCORD_WEBHOOK_URL` | `https://discord.com/api/...` | Discord incident notification webhook |
+| `TELEGRAM_BOT_TOKEN` | `123456789:ABCdef...` | Telegram bot API token |
+| `TELEGRAM_CHAT_ID` | `987654321` | Telegram chat ID for incident alerts |
+| `SLACK_WEBHOOK_URL` | `https://hooks.slack.com/...`| Slack incident alert webhook |
+
+### Workflows Triggered:
+- [`.github/workflows/uptrace-keepalive.yml`](.github/workflows/uptrace-keepalive.yml): Runs **every 12 hours** to ping all services, keep cloud apps/databases warm, and trigger immediate email alerts if any monitor fails.
+- [`.github/workflows/uptrace-weekly-report.yml`](.github/workflows/uptrace-weekly-report.yml): Runs **every Monday at 09:00 AM IST** to compile 7-day SLA performance metrics and dispatch the HTML weekly digest email.
 
 ---
 
@@ -166,8 +202,8 @@ To keep your cloud apps awake without running your local PC:
 
 ```text
 uptrace/
-├── app.py                   # Main Flask app, OAuth 2.0, and Uptrace Engine
-├── run_monitor.py           # Headless CLI runner for GitHub Actions & Crons
+├── app.py                   # Main Flask app, OAuth 2.0, Weekly Digest & Uptrace Engine
+├── run_monitor.py           # Headless CLI runner for GitHub Actions, Reports & Alerts
 ├── config.json              # Monitored apps, DB targets, methods, and schedules
 ├── STATUS.md                # Real-time status report with GitHub shields
 ├── design.md                # Better Stack Midnight SRE design specification
@@ -176,9 +212,12 @@ uptrace/
 ├── requirements.txt         # Dependencies
 ├── .github/
 │   └── workflows/
-│       └── uptrace-keepalive.yml # 24/7 GitHub Actions keep-alive runner
+│       ├── uptrace-keepalive.yml     # 12-hour GitHub Actions keep-alive & incident runner
+│       └── uptrace-weekly-report.yml # Weekly SRE report & email digest workflow
 ├── data/
-│   └── uptime_history.json  # Check history & latency records (git-ignored)
+│   ├── uptime_history.json  # Check history & latency records (git-ignored)
+│   ├── incident_state.json  # Active incident state tracker (git-ignored)
+│   └── incidents.json       # Historical incident & resolution logs (git-ignored)
 ├── logs/
 │   └── uptrace.log          # Runtime log file (git-ignored)
 ├── templates/
