@@ -329,3 +329,13 @@
 2026-09-18 21:45:29,917 [ERROR] Failed to send weekly report email: (535, b'5.7.139 Authentication unsuccessful, SmtpClientAuthentication is disabled for the Mailbox. Visit https://aka.ms/smtp_auth_disabled for more information. [CY5PR15CA0216.namprd15.prod.outlook.com 2026-09-18T16:15:29.912Z 08DF154366A2AEDB]')
 2026-09-18 21:45:29,917 [WARNING] ℹ️ Weekly report status: (535, b'5.7.139 Authentication unsuccessful, SmtpClientAuthentication is disabled for the Mailbox. Visit https://aka.ms/smtp_auth_disabled for more information. [CY5PR15CA0216.namprd15.prod.outlook.com 2026-09-18T16:15:29.912Z 08DF154366A2AEDB]')
 2026-09-18 21:45:29,917 [INFO] ✨ Uptrace Run Finished.
+2026-09-18 21:55:00,857 [INFO] ============================================================
+2026-09-18 21:55:00,857 [INFO] ⚡ Starting Uptrace Headless Monitor Run
+2026-09-18 21:55:00,857 [INFO] ============================================================
+2026-09-18 21:55:01,169 [INFO] ✅ [GET][PRODUCTION][300s] Bolt Note (Web App) - HEALTHY (163.69ms) - 200
+2026-09-18 21:55:01,838 [INFO] ✅ [GET][PRODUCTION][300s] PrepWise AI (Database Keep-Alive) - HEALTHY (818.29ms) - 200
+2026-09-18 21:55:02,498 [INFO] ✅ [GET][PRODUCTION][300s] Weather Forecaster (Web Application) - HEALTHY (1504.87ms) - 200
+2026-09-18 21:55:03,190 [INFO] ✅ [GET][PRODUCTION][300s] tiny-to (Web & Database) - HEALTHY (2172.76ms) - 200
+2026-09-18 21:55:06,851 [INFO] ✅ [GET][PRODUCTION][300s] FinGuide-Ai (Web App) - HEALTHY (5851.78ms) - 200
+2026-09-18 21:55:06,854 [INFO] 📊 Run Complete: 5/5 services operational (0 issues).
+2026-09-18 21:55:06,854 [INFO] ✨ Uptrace Run Finished.
