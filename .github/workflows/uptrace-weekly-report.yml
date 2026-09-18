@@ -35,7 +35,7 @@ jobs:
           TZ: 'Asia/Kolkata'
           TIMEZONE: 'Asia/Kolkata'
           TIMEZONE_CODE: 'IST'
-          SMTP_ENABLED: ${{ secrets.SMTP_ENABLED || 'false' }}
+          SMTP_ENABLED: ${{ secrets.SMTP_ENABLED || 'true' }}
           SMTP_HOST: ${{ secrets.SMTP_HOST }}
           SMTP_PORT: ${{ secrets.SMTP_PORT || '587' }}
           SMTP_USER: ${{ secrets.SMTP_USER }}
