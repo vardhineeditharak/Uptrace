@@ -147,15 +147,16 @@ To host the interactive **Midnight SRE Web Console** on Render with zero secret 
 | `GITHUB_CLIENT_ID` | `Iv1.xxxxxxxxxxxx` *(Optional)* | GitHub OAuth App Client ID |
 | `GITHUB_CLIENT_SECRET` | `xxxxxxxxxxxxxxxx` *(Optional)* | GitHub OAuth App Secret |
 | `ALLOWED_GITHUB_USERS` | `your_github_username` | Whitelisted GitHub accounts |
+| `RESEND_API_KEY` | `re_xxxxxxxxxxxxxxxx` | Resend API Key (from [resend.com/api-keys](https://resend.com/api-keys)) |
 | `SMTP_ENABLED` | `true` | Enables incident email alerts |
-| `SMTP_HOST` | `smtp.gmail.com` | SMTP host |
-| `SMTP_PORT` | `587` | SMTP port (587 for TLS, 465 for SSL) |
-| `SMTP_USER` | `your-email@gmail.com` | Sender account |
-| `SMTP_PASSWORD` | `your-16-char-app-password` | Gmail App Password |
-| `ALERT_SENDER_EMAIL` | `your-email@gmail.com` | From email address |
-| `ALERT_RECEIVER_EMAIL` | `your-alerts-inbox@gmail.com` | To email address (incident recipient) |
+| `SMTP_HOST` | `smtp.resend.com` | SMTP host (`smtp.resend.com` or `smtp.gmail.com`) |
+| `SMTP_PORT` | `465` | SMTP port (`465` SSL for Resend, `587` TLS) |
+| `SMTP_USER` | `resend` | Sender account (`resend` for Resend SMTP) |
+| `SMTP_PASSWORD` | `re_xxxxxxxxxxxxxxxx` | Resend API Key or SMTP password |
+| `ALERT_SENDER_EMAIL` | `onboarding@resend.dev` | Sender email address (`onboarding@resend.dev` or verified domain) |
+| `ALERT_RECEIVER_EMAIL` | `your-alerts-inbox@gmail.com` | Incident & weekly report recipient |
 | `WEEKLY_REPORT_ENABLED` | `true` | Enables weekly SRE digest emails |
-| `WEEKLY_REPORT_RECIPIENT`| `your-alerts-inbox@gmail.com` | Recipient for weekly reports |
+| `WEEKLY_REPORT_RECIPIENT`| `your-alerts-inbox@gmail.com` | Dedicated recipient for weekly reports |
 | `ENABLE_GIT_AUTO_COMMIT` | `true` | Pushes live config edits to GitHub |
 | `GITHUB_TOKEN` | `ghp_xxxxxxxxxxxxxxxxxxxx` | GitHub PAT for REST API repo sync |
 | `GITHUB_REPOSITORY` | `vardhineeditharak/Uptrace` | GitHub repository name |
@@ -169,17 +170,18 @@ To host the interactive **Midnight SRE Web Console** on Render with zero secret 
 To keep your cloud apps awake and receive weekly reports automatically without running your local PC or keeping Render awake:
 
 1. In your GitHub repository, navigate to: **Settings > Secrets and variables > Actions**.
-2. Click **New repository secret** and add these secrets:
+2. Click **New repository secret** or run `gh secret set -f secrets.env` to bulk set:
 
-### Required Secrets for GitHub Actions:
+### Recommended Secrets for GitHub Actions (Using Resend):
 | GitHub Secret Name | Recommended Value | Description |
 | :--- | :--- | :--- |
+| `RESEND_API_KEY` | `re_xxxxxxxxxxxx` | Resend API Key ([resend.com](https://resend.com)) |
 | `SMTP_ENABLED` | `true` | Enables email sending inside GitHub Actions |
-| `SMTP_HOST` | `smtp.gmail.com` | SMTP Server (Gmail, SendGrid, Outlook, SES) |
-| `SMTP_PORT` | `587` | SMTP Port (`587` for STARTTLS, `465` for SSL) |
-| `SMTP_USER` | `your-email@gmail.com` | Your SMTP username / email address |
-| `SMTP_PASSWORD` | `your-16-char-app-password` | 16-character Google App Password |
-| `ALERT_SENDER_EMAIL` | `your-email@gmail.com` | Sender email address |
+| `SMTP_HOST` | `smtp.resend.com` | SMTP Server (`smtp.resend.com`) |
+| `SMTP_PORT` | `465` | SMTP Port (`465` SSL) |
+| `SMTP_USER` | `resend` | SMTP Username (`resend`) |
+| `SMTP_PASSWORD` | `re_xxxxxxxxxxxx` | Resend API Key |
+| `ALERT_SENDER_EMAIL` | `onboarding@resend.dev` | Free testing sender or your verified domain |
 | `ALERT_RECEIVER_EMAIL` | `your-alerts-inbox@gmail.com`| Where incident alerts & weekly reports go |
 
 ### Optional Secrets:

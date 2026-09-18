@@ -849,14 +849,19 @@ class UptraceEngine:
     def send_email_alert(self, service_result, is_recovery=False):
         smtp_enabled = os.getenv('SMTP_ENABLED', 'false').lower() in ('true', '1', 'yes')
         smtp_host = os.getenv('SMTP_HOST')
-        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        smtp_port = int(os.getenv('SMTP_PORT', '465' if smtp_host == 'smtp.resend.com' else '587'))
         smtp_user = os.getenv('SMTP_USER')
         smtp_pass = os.getenv('SMTP_PASSWORD')
-        sender = os.getenv('ALERT_SENDER_EMAIL') or smtp_user
+        resend_api_key = os.getenv('RESEND_API_KEY') or (smtp_pass if (smtp_host == 'smtp.resend.com' or (smtp_pass and str(smtp_pass).startswith('re_'))) else None)
+        sender = os.getenv('ALERT_SENDER_EMAIL') or smtp_user or "onboarding@resend.dev"
         receiver = os.getenv('ALERT_RECEIVER_EMAIL') or smtp_user
 
-        if not smtp_enabled or not smtp_host or not smtp_user:
-            logger.debug("SMTP alert skipped: SMTP_ENABLED is false or credentials missing in .env")
+        if not smtp_enabled and not resend_api_key:
+            logger.debug("Email alert skipped: SMTP_ENABLED is false and RESEND_API_KEY not configured")
+            return False
+
+        if not receiver:
+            logger.warning("Email alert skipped: ALERT_RECEIVER_EMAIL is not set")
             return False
 
         env_tag = service_result.get('environment', 'production').upper()
@@ -911,6 +916,39 @@ Time: {timestamp}
         </html>
         """
 
+        # 1. Native Resend REST API (Fastest, zero port blocks)
+        if resend_api_key:
+            from_addr = sender if (sender and '@' in sender and not sender.endswith('outlook.com') and not sender.endswith('gmail.com')) else "Uptrace Alerts <onboarding@resend.dev>"
+            try:
+                resend_payload = {
+                    "from": from_addr,
+                    "to": [receiver],
+                    "subject": subject,
+                    "html": html_content,
+                    "text": plain_text
+                }
+                res = requests.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {resend_api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json=resend_payload,
+                    timeout=10
+                )
+                if res.status_code in [200, 201]:
+                    logger.info(f"📧 Immediate Email alert dispatched via Resend REST API to {receiver} for [{env_tag}] {service_result['name']}")
+                    return True
+                else:
+                    logger.warning(f"Resend REST API response ({res.status_code}): {res.text}. Trying SMTP fallback...")
+            except Exception as e:
+                logger.warning(f"Resend REST API exception: {e}. Trying SMTP fallback...")
+
+        # 2. Standard SMTP Relay (smtp.resend.com, Gmail, SES, etc.)
+        if not smtp_host or not smtp_user:
+            logger.debug("SMTP relay skipped: SMTP_HOST or SMTP_USER missing")
+            return False
+
         try:
             msg = MIMEMultipart('alternative')
             msg['Subject'] = subject
@@ -928,7 +966,7 @@ Time: {timestamp}
             server.login(smtp_user, smtp_pass)
             server.sendmail(sender, [receiver], msg.as_string())
             server.quit()
-            logger.info(f"📧 Immediate Email alert dispatched to {receiver} for [{env_tag}] {service_result['name']}")
+            logger.info(f"📧 Immediate Email alert dispatched via SMTP to {receiver} for [{env_tag}] {service_result['name']}")
             return True
         except Exception as e:
             logger.error(f"Failed to send email alert to {receiver}: {e}")
@@ -1133,14 +1171,23 @@ Time: {timestamp}
     def send_weekly_report_email(self, recipient=None):
         smtp_enabled = os.getenv('SMTP_ENABLED', 'false').lower() in ('true', '1', 'yes')
         smtp_host = os.getenv('SMTP_HOST')
-        smtp_port = int(os.getenv('SMTP_PORT', '587'))
+        smtp_port = int(os.getenv('SMTP_PORT', '465' if smtp_host == 'smtp.resend.com' else '587'))
         smtp_user = os.getenv('SMTP_USER')
         smtp_pass = os.getenv('SMTP_PASSWORD')
-        sender = os.getenv('ALERT_SENDER_EMAIL') or smtp_user
+        resend_api_key = os.getenv('RESEND_API_KEY') or (smtp_pass if (smtp_host == 'smtp.resend.com' or (smtp_pass and str(smtp_pass).startswith('re_'))) else None)
+        sender = os.getenv('ALERT_SENDER_EMAIL') or smtp_user or "onboarding@resend.dev"
         receiver = recipient or os.getenv('WEEKLY_REPORT_RECIPIENT') or os.getenv('ALERT_RECEIVER_EMAIL') or smtp_user
 
         data = self.generate_weekly_report_data()
         subject = f"📊 [WEEKLY REPORT] Uptrace SRE Performance & Reliability ({data['date_range']}) — {data['overall_sla']}% SLA"
+
+        if not smtp_enabled and not resend_api_key:
+            logger.warning("⚠️ Email delivery is disabled or credentials missing. Weekly report not dispatched.")
+            return {"status": "skipped", "message": "Email delivery is disabled or not configured in .env", "data": data}
+
+        if not receiver:
+            logger.warning("⚠️ Weekly report skipped: No recipient email configured.")
+            return {"status": "skipped", "message": "No recipient email configured", "data": data}
 
         rows_html = ""
         for s in data['services']:
@@ -1288,9 +1335,38 @@ Time: {timestamp}
 
         plain_text = f"Uptrace Weekly SRE Report ({data['date_range']})\nOverall 7-Day SLA: {data['overall_sla']}%\nActive Services: {data['total_services']}\nTotal Incidents: {data['total_incidents']}\nAvg Latency: {data['avg_latency']}ms\n"
 
-        if not smtp_enabled or not smtp_host or not smtp_user:
-            logger.warning("⚠️ SMTP is disabled or incomplete in .env. Weekly report not dispatched via email.")
-            return {"status": "skipped", "message": "SMTP is disabled or not configured in .env", "data": data}
+        # 1. Native Resend REST API (Fastest, zero port blocks)
+        if resend_api_key:
+            from_addr = sender if (sender and '@' in sender and not sender.endswith('outlook.com') and not sender.endswith('gmail.com')) else "Uptrace <onboarding@resend.dev>"
+            try:
+                resend_payload = {
+                    "from": from_addr,
+                    "to": [receiver],
+                    "subject": subject,
+                    "html": html_content,
+                    "text": plain_text
+                }
+                res = requests.post(
+                    "https://api.resend.com/emails",
+                    headers={
+                        "Authorization": f"Bearer {resend_api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json=resend_payload,
+                    timeout=12
+                )
+                if res.status_code in [200, 201]:
+                    logger.info(f"📧 Weekly SRE report successfully mailed via Resend REST API to {receiver}")
+                    return {"status": "success", "recipient": receiver, "subject": subject, "data": data}
+                else:
+                    logger.warning(f"Resend REST API response ({res.status_code}): {res.text}. Trying SMTP relay fallback...")
+            except Exception as e:
+                logger.warning(f"Resend REST API exception: {e}. Trying SMTP fallback...")
+
+        # 2. Standard SMTP Relay
+        if not smtp_host or not smtp_user:
+            logger.warning("⚠️ SMTP relay is incomplete in .env. Weekly report not dispatched via email.")
+            return {"status": "skipped", "message": "SMTP relay not configured", "data": data}
 
         try:
             msg = MIMEMultipart('alternative')
@@ -1309,7 +1385,7 @@ Time: {timestamp}
             server.login(smtp_user, smtp_pass)
             server.sendmail(sender, [receiver], msg.as_string())
             server.quit()
-            logger.info(f"📧 Weekly SRE report successfully mailed to {receiver}")
+            logger.info(f"📧 Weekly SRE report successfully mailed via SMTP to {receiver}")
             return {"status": "success", "recipient": receiver, "subject": subject, "data": data}
         except Exception as e:
             logger.error(f"Failed to send weekly report email: {e}")
